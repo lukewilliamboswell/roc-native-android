@@ -1,122 +1,126 @@
-# roc-native-android (spike)
+# Roc Native Android
 
 > This is an early proof of concept. My goal is to show how roc-signals might
 > look for native UI. I'm not sure where this project will go: I've written it
 > for a bit of fun, and to help with the development of the reactive engine in
 > Roc. If you're interested in this work, let me know.
 
-A Roc platform for native Android UI, built on the reactive engine from
-[roc-signals](../roc-signals). Apps are pure Roc; the engine decides exactly
-which Views change, and a Kotlin host applies its command stream to real
-Android widgets (no WebView).
+Write Android apps in [Roc](https://www.roc-lang.org). Your app is pure Roc;
+it draws real Android widgets (no WebView), and the reactive engine from
+[roc-signals](https://github.com/lukewilliamboswell/roc-signals) updates
+exactly the views that depend on what changed.
 
+```roc
+app [main] { pf: platform "../../platform/main.roc" }
+
+import pf.Engine exposing [Elem, In, Root, State]
+import pf.Ui
+
+main : Engine.Program
+main = Engine.program_startup({}, Engine.entries({ fallback: Some("/") }, [{ path: "/", route: 0.U8 }]), |_route| Engine.state(0, view))
+
+view : State(In(Root, I64), I64) -> Elem(In(Root, I64))
+view = |count|
+	Ui.column(
+		[
+			Ui.title("Counter"),
+			Ui.text_s(count.signal().map(|n| "Count: ${n.to_str()}")),
+			Ui.row([
+				Ui.button("-", count.update(|n| n - 1)),
+				Ui.button("+", count.update(|n| n + 1)),
+			]),
+		],
+	)
 ```
- Roc app (examples/*)          platform/ (Roc)                 android/ (Kotlin)
- Ui.column / Ui.button  ──►  Engine + Core (verbatim)  ──►  Tree.kt   decode commands (protocol 23)
-                             main.roc  provides init/event   Host.kt   turns, timers, startup ack
-                             host/host.zig  JNI, no libc     ViewRenderer.kt  Tree ─► Views
-                                   │
-                    roc build --target=arm64musl ─► libcounter.so (jniLibs/arm64-v8a)
-                    roc build --target=arm64mac  ─► libcounter.dylib (desktop smoke test)
+
+Tapping "+" changes one text view; nothing else is redrawn.
+
+## Getting started
+
+You need:
+
+- **Roc**: the 0.1.0 release candidate or a recent nightly.
+- **Android Studio**: it brings the SDK and an emulator. Create an **arm64**
+  device (API 26 or later). Apps are built for arm64 only.
+- **Zig**: only while the platform is built from source. A published
+  platform release will carry its native parts, and Zig won't be needed.
+
+There is no published release yet, so start from this repository:
+
+```sh
+git clone https://github.com/lukewilliamboswell/roc-native-android
+cd roc-native-android/android
+printf 'roc.exe=%s\nzig.exe=%s\n' "$(which roc)" "$(which zig)" >> local.properties
+./gradlew installDebug
 ```
 
-## What is copied, what is new
+Or open `android/` in Android Studio and press **Run**. The first build takes
+a few minutes. After that, only the apps you changed are rebuilt.
 
-- **Verbatim from roc-signals** (`platform/`): `Core`, `Engine`, `SignalCore`,
-  `TableCore`, `View`, `Seq`, `Layout`, `EntryRoutes`, `ReadyIndex`, `Url`,
-  `Spelling`, `MarkupAdvice`, `Web`. `Web` and the `parser` package are there
-  only because the engine imports them (it checks element/attribute names);
-  apps never see them.
-- **New**:
-  - `platform/Ui.roc`: the native vocabulary (`column`, `row`, `list`,
-    `title`, `text`, `button`, `text_field`, `checkbox`, …), one engine
-    element per View.
-  - `platform/main.roc`: the platform root, a slimmed roc-signals root with
-    mount, event and drop only.
-  - `host/host.zig`: the JNI host. It is freestanding, with no libc
-    and no NDK: the `.so` has no undefined symbols, no `NEEDED` entries and
-    no TLS.
-  - `android/`: the Kotlin host and app.
-- **No glue file**: the Roc↔host boundary is four functions taking
-  `List(U8)`, a `Box` and `U32`, so a handwritten `extern struct` covers it.
+Each app in `examples/` gets its own launcher icon. To start your own, copy
+an example to `examples/<name>/main.roc`. Gradle finds it automatically. For
+now you also add a one-line activity for it, in
+`android/app/src/main/java/dev/roc/android/RocActivity.kt` and
+`AndroidManifest.xml`; follow the existing examples.
+
+### What Gradle does with `roc build`
+
+The phone runs your app as a native library, so Gradle builds each app with:
+
+```sh
+roc build --target=arm64musl --output=libcounter.so examples/counter/main.roc
+```
+
+It then packages the result with the platform's small Kotlin shell into an
+APK. A plain `roc build main.roc` builds for the computer you are on. That
+gives a desktop library the platform uses for its own tests, not something a
+phone can load.
+
+## Writing an app
+
+Apps use two modules from the platform:
+
+- **`Engine`**: state, signals, the shared store, tables, effects and entry
+  routes. It is the same engine as roc-signals, so its
+  [guide](https://lukewilliamboswell.github.io/roc-signals/docs/guide/)
+  applies. Read "Ui" where it says "Html".
+- **`Ui`**: the screens. Each builder becomes one Android view:
+
+| Builder | View |
+|---|---|
+| `Ui.column`, `Ui.list` | a vertical layout (`list` adds dividers) |
+| `Ui.row` | a horizontal layout; plain text in it takes the spare width |
+| `Ui.title`, `Ui.text`, `Ui.text_s`, `Ui.warning` | text |
+| `Ui.button`, `Ui.button_s` | a button |
+| `Ui.text_field` | a one-line text field (`on_change`, `on_done`) |
+| `Ui.checkbox` | a checkbox |
+| `Ui.describe` | an accessibility description for any element |
 
 ## Examples
 
-| Example | Exercises |
+| Example | Shows |
 |---|---|
-| `examples/counter` | local state, signals into text, `Engine.when` |
-| `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
-| `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| [`counter`](examples/counter/main.roc) | local state, text that follows it, showing and hiding |
+| [`todos`](examples/todos/Todos.roc) | a store, a table of rows with a filter, a text field and checkboxes |
+| [`stopwatch`](examples/stopwatch/main.roc) | a repeating timer that starts and stops with the app's state |
 
-Each example is its own launcher icon, with its own process and task, because a
-library holds one engine and every app exports the same JNI names.
+## Limits
 
-## Layout
+- Supported effects: timers and intervals. Storage, HTTP, files, workers and
+  ports are not supported yet: an app that asks for one stops with "unsupported
+  effect kind".
+- Input is limited to taps, text entry, checkboxes and the keyboard's action
+  key.
+- arm64 devices and emulators only.
+- If your app crashes, the process ends and the message is in logcat
+  (`adb logcat | grep -i roc`).
 
-```
-host/host.zig        the JNI host (Zig), built into each target's libhost.a
-platform/main.roc    the platform root, Ui.roc and the verbatim engine
-platform/targets/    host outputs, built by build-host.sh, never committed
-examples/            the three apps, depending on the working tree
-android/             the Kotlin host and app shell (not part of the bundle)
-```
+## Contributing
 
-## Build and run
-
-```sh
-ROC=~/roc-macos_apple_silicon-0.1.0_RC1/roc ZIG=zig ./build.sh   # host + all examples (.so and .dylib)
-./smoke.sh                                                        # desktop JVM: real engine via JNI, scripted taps
-ROC=... ./bundle.sh                                               # the platform bundle, into build/bundle/
-cd android && ./gradlew installDebug                              # needs the Android SDK (Android Studio)
-```
-
-## What the platform bundle redistributes
-
-`roc bundle` finds the `.roc` modules itself. It only checks that the target
-inputs exist, so `bundle.sh` names them, and the license files, explicitly.
-The bundle holds:
-
-- the platform's `.roc` source;
-- `targets/arm64musl/libhost.a` and `targets/arm64mac/libhost.a`: one
-  `host.o` each. On Android it defines `memcpy`/`memset` itself, the only C
-  runtime routines a freestanding `.so` needs, so no runtime library ships;
-- `LICENSE` (UPL-1.0) and `THIRD_PARTY_LICENSES.md`.
-
-The archives are assembled from objects with fixed member names, so their
-bytes carry no build-machine paths. There are no external linker inputs, and
-so nothing like `.tbd` stubs:
-
-- **Android:** the linked `.so` has no undefined symbols, no `NEEDED`
-  entries and no TLS. It uses no NDK library and no JNI header: JNI is
-  reached through the `JNIEnv` function table the VM hands it, and Android
-  APIs are called from Kotlin.
-- **macOS:** the host uses only libSystem, which Roc's own stub resolves.
-
-If the host ever calls an NDK library directly (`liblog`, `libandroid`), the
-counterpart of a `.tbd` is a stub ELF `.so`: generated from a reviewed symbol
-catalog, released as an external linker input, and linked against, while the
-real library comes from the device. The Android SDK, AGP and the Kotlin app
-shell are build tools of the app, never part of the bundle.
-
-Alternatively, open `android/` in Android Studio and press Run with an arm64
-emulator or a device. The app targets API 37 with AGP 9.5 (built-in Kotlin).
-It has been run on the API 37 arm64 emulator: all three examples mount, take
-taps and typing, and the stopwatch's interval stops when it is cancelled. If the
-emulator refuses to start for lack of disk space, run
-`emulator -avd <name> -partition-size 4096`.
-
-## Spike limits
-
-- The host implements only what the examples need: element, text, template
-  and row commands, LISTEN, PROP value/checked, timers and intervals,
-  startup ack and opportunity. Other effects (HTTP, storage, workers, ports)
-  stop with "unsupported effect kind". NAV and STORAGE writes are ignored.
-- Events: click, input, change (checkbox), and `done` (keyboard action).
-- A Roc crash ends the process through JNI `FatalError` (the message goes to
-  logcat). Boot bytes are empty: fallback entry, no storage or environment.
-- arm64 only.
+See [CONTRIBUTING.md](CONTRIBUTING.md): how the platform works, building and
+testing it, and what its bundle redistributes.
 
 ## License
 
-[UPL-1.0](LICENSE). See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for
+[UPL-1.0](LICENSE). [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) lists
 what the platform bundle contains.
