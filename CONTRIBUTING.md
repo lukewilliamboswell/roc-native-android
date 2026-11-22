@@ -90,6 +90,14 @@ the emulator refuses to start for lack of disk space, run
 - **Effects:** timers and intervals; subscriptions no feature serves are
   accepted and stay idle. Any other effect kind stops with "unsupported
   effect kind".
+- **HTTP** (FX 1, `HttpFeature.kt`): `HttpURLConnection` on a background
+  pool, with answers, timeouts and progress (tag 26, receiving only) delivered
+  on the engine thread. CANCEL disconnects and nothing is answered after it.
+  Best effort: there is no HTTP cache or cookie store, so `cache` only adds
+  fetch's request headers and `SameOrigin`/`Include` behave alike. Redirects
+  follow `HttpURLConnection` (never across http/https). The response body
+  has no bound beyond memory. A method `HttpURLConnection` refuses answers
+  `Network`. File bodies (FX 12, 15) belong to the files feature.
 - **Events:** click, input, change (checkbox) and `done` (the keyboard's
   action key).
 - **Faults:** a Roc crash ends the process through JNI `FatalError`, and the

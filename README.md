@@ -103,12 +103,14 @@ Apps use two modules from the platform:
 | [`counter`](examples/counter/main.roc) | local state, text that follows it, showing and hiding |
 | [`todos`](examples/todos/Todos.roc) | a store, a table of rows with a filter, a text field and checkboxes |
 | [`stopwatch`](examples/stopwatch/main.roc) | a repeating timer that starts and stops with the app's state |
+| [`http`](examples/http/main.roc) | an HTTPS request: loading, progress, status, network and timeout errors, retry and cancel |
 
 ## Limits
 
-- Supported effects: timers and intervals. Storage, HTTP, files, workers and
-  ports are not supported yet: an app that asks for one stops with "unsupported
-  effect kind".
+- Supported effects: timers, intervals and HTTP (`Engine.http`; no cookie
+  store or HTTP cache, and plain `http://` is blocked by Android's default).
+  Storage, files, workers and ports are not supported yet: an app that asks
+  for one stops with "unsupported effect kind".
 - Input is limited to taps, text entry, checkboxes and the keyboard's action
   key.
 - arm64 devices and emulators only.

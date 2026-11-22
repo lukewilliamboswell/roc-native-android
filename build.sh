@@ -7,7 +7,7 @@
 set -e
 cd "$(dirname "$0")"
 ROC=${ROC:-roc}
-EXAMPLES=${*:-counter todos stopwatch}
+EXAMPLES=${*:-counter todos stopwatch http}
 ./build-host.sh
 mkdir -p build/android
 for e in $EXAMPLES; do
