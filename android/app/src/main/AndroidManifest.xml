@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- HTTP (FX kind 1). Cleartext stays off: the http example uses https. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- One launcher entry per example, each in its own process: a Roc
          library holds one engine, and every app exports the same JNI names. -->
     <application android:label="Roc Android" android:theme="@android:style/Theme.Material.Light.NoActionBar">
@@ -16,6 +18,12 @@
             </intent-filter>
         </activity>
         <activity android:name=".StopwatchActivity" android:label="Roc Stopwatch" android:process=":stopwatch" android:taskAffinity="dev.roc.android.stopwatch" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".HttpActivity" android:label="Roc HTTP" android:process=":http" android:taskAffinity="dev.roc.android.http" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -48,3 +48,4 @@ abstract class RocActivity : Activity() {
 class CounterActivity : RocActivity() { override val library = "counter" }
 class TodosActivity : RocActivity() { override val library = "todos" }
 class StopwatchActivity : RocActivity() { override val library = "stopwatch" }
+class HttpActivity : RocActivity() { override val library = "http" }

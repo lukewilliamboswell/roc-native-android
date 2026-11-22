@@ -47,6 +47,7 @@ Android widgets (no WebView).
 | `examples/counter` | local state, signals into text, `Engine.when` |
 | `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
 | `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| `examples/http` | `Engine.http` over HTTPS from a `watch_latest` site: loading, progress, status, network and timeout failures, retry and cancel |
 
 Each example is its own launcher icon, with its own process and task, because a
 library holds one engine and every app exports the same JNI names.
@@ -109,8 +110,20 @@ emulator refuses to start for lack of disk space, run
 
 - The host implements only what the examples need: element, text, template
   and row commands, LISTEN, PROP value/checked, timers and intervals,
-  startup ack and opportunity. Other effects (HTTP, storage, workers, ports)
+  startup ack and opportunity, and HTTP. Other effects (storage, workers, ports)
   stop with "unsupported effect kind". NAV and STORAGE writes are ignored.
+- HTTP (FX kind 1, `HttpFeature.kt`) runs on `HttpURLConnection` in a
+  background pool; answers, timeouts (one engine-thread timer, capped at
+  600 s) and progress (tag 26, receiving only) are delivered on the engine
+  thread, and CANCEL disconnects without answering. Best effort: no HTTP
+  cache or cookie store is installed, so `cache` only adds fetch's request
+  headers (`NoStore`/`Reload`: `Cache-Control`/`Pragma: no-cache`,
+  `NoCache`: `max-age=0`) and `SameOrigin`/`Include` behave alike (no ambient
+  cookies, app headers always sent). Redirects follow `HttpURLConnection`
+  (not across http/https). The response body has no host bound beyond
+  memory. Methods `HttpURLConnection` refuses (PATCH on the desktop JVM)
+  answer `Network`. Cleartext http is off (Android's default). File bodies (FX 12, 15)
+  are not here.
 - Events: click, input, change (checkbox), and `done` (keyboard action).
 - A Roc crash ends the process through JNI `FatalError` (the message goes to
   logcat). Boot bytes are empty: fallback entry, no storage or environment.

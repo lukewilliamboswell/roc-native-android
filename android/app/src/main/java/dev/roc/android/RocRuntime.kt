@@ -11,6 +11,7 @@ import android.util.Log
  * one here to enable it.
  */
 fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
+    HttpFeature(),
 )
 
 /**

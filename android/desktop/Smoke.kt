@@ -12,8 +12,18 @@ class ManualPlatform : Platform {
     var now = 0L
     private var seq = 0
     private val pending = sortedMapOf<Pair<Long, Int>, () -> Unit>(compareBy({ it.first }, { it.second }))
+    // Work posted from other threads (a feature's executor) waits here until
+    // the test thread drains it (`advance`, `pump`); `posted` counts it.
+    private val owner = Thread.currentThread()
+    private val inbox = java.util.concurrent.ConcurrentLinkedQueue<() -> Unit>()
+    val posted = java.util.concurrent.atomic.AtomicInteger()
     override fun nowMs() = now
     override fun schedule(ms: Long, task: () -> Unit): () -> Unit {
+        if (Thread.currentThread() !== owner) {
+            posted.incrementAndGet()
+            inbox.add { schedule(ms, task) }
+            return {}
+        }
         val key = (now + ms) to seq++
         pending[key] = task
         return { pending.remove(key) }
@@ -22,6 +32,7 @@ class ManualPlatform : Platform {
     override fun title(text: String) = println("title: $text")
 
     fun advance(ms: Long) {
+        while (true) inbox.poll()?.invoke() ?: break
         val end = now + ms
         while (true) {
             val next = pending.keys.firstOrNull()?.takeIf { it.first <= end } ?: break
@@ -29,6 +40,24 @@ class ManualPlatform : Platform {
             pending.remove(next)!!()
         }
         now = end
+    }
+
+    /**
+     * Run posted work, the manual clock following real time, until `done`
+     * holds or `timeoutMs` of real time passes; whether it held.
+     */
+    fun pump(timeoutMs: Long = 5000, done: () -> Boolean): Boolean {
+        val start = System.nanoTime()
+        var last = start
+        while (true) {
+            val t = System.nanoTime()
+            val ms = (t - last) / 1_000_000
+            advance(ms)
+            last += ms * 1_000_000
+            if (done()) return true
+            if (t - start > timeoutMs * 1_000_000) return false
+            Thread.sleep(5)
+        }
     }
 }
 
@@ -70,7 +99,8 @@ fun main(args: Array<String>) {
     System.load(File(args[0]).absolutePath)
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
-    val host = Host(platform)
+    val features = listOf<Feature>(HttpSmoke.feature())
+    val host = Host(platform, features)
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -125,6 +155,7 @@ fun main(args: Array<String>) {
             host.dispatch(host.button("Reset"), "click")
             expect("reset", text().contains("0:00.0") && !text().contains("Lap 1"))
         }
+        "http" -> HttpSmoke.run(host, platform)
     }
     println("final:\n" + show(host.tree.root))
     host.stop()
