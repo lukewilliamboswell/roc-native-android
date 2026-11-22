@@ -105,6 +105,14 @@ the emulator refuses to start for lack of disk space, run
   `prefers-color-scheme` and `prefers-reduced-motion`. A
   deterministic-startup program boots on neutral facts and samples them with
   FX 22, as in the browser.
+- **Navigation** (op 15, FX 5, boot section 1; `NavigationFeature.kt`):
+  history lives in the runtime, so it survives rotation. System back pops it
+  and answers popstate subscribers with tag 6, and at the root it leaves the
+  app. URLs resolve against the current entry; other origins are refused.
+  A click inside a `ui-link`/`a` with `href` carries the link facts (the app
+  decides whether to navigate; nothing happens by default). The launching
+  Intent's path is the first entry (deep links). History is not saved
+  across process death.
 - **HTTP** (FX 1, `HttpFeature.kt`): `HttpURLConnection` on a background
   pool, with answers, timeouts and progress (tag 26, receiving only) delivered
   on the engine thread. CANCEL disconnects and nothing is answered after it.

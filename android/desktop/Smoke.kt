@@ -87,6 +87,8 @@ fun Host.find(pred: (Element) -> Boolean): Element =
     all(tree.root).filterIsInstance<Element>().first(pred)
 
 fun Host.button(text: String) = find { it.tag == "ui-button" && it.textContent() == text }
+fun Host.link(text: String) = find { it.tag == "ui-link" && it.textContent() == text }
+fun Host.heading() = find { it.tag == "ui-title" }.textContent()
 fun Host.rows() = all(tree.root).filterIsInstance<Element>().filter { it.tag == "ui-row" && it.parent?.tag == "ui-list" }.toList()
 
 var failures = 0
@@ -99,7 +101,8 @@ fun main(args: Array<String>) {
     System.load(File(args[0]).absolutePath)
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
-    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature())
+    val navigation = NavigationFeature() // history and back (pages)
+    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature() + navigation)
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -156,6 +159,32 @@ fun main(args: Array<String>) {
         }
         "http" -> HttpSmoke.run(host, platform)
         "device" -> { deviceCase(host, platform); zoneCases() }
+        "pages" -> {
+            expect("starts at home", host.heading() == "Home" && navigation.history.current == "/")
+            host.dispatch(host.link("About"), "click")
+            expect("link pushes /about", host.heading() == "About" && navigation.history.depth == 2 && navigation.history.current == "/about")
+            host.dispatch(host.link("See the items"), "click")
+            host.dispatch(host.link("Item 2"), "click")
+            expect("parameter page", host.heading() == "Item" && text().contains("Item 2") && navigation.history.current == "/items/2")
+            expect("four entries", navigation.history.depth == 4)
+            expect("back to items", navigation.back(host) && host.heading() == "Items" && text().contains("At /items"))
+            host.dispatch(host.link("Item 3"), "click")
+            expect("item 3 after back", text().contains("Item 3") && navigation.history.depth == 4)
+            expect("back to items again", navigation.back(host) && host.heading() == "Items")
+            expect("back to about", navigation.back(host) && host.heading() == "About")
+            expect("back to home", navigation.back(host) && host.heading() == "Home" && text().contains("At /"))
+            expect("back at the root finishes", !navigation.back(host))
+            val h = History("/items/2?x=1#f")
+            expect("resolve relative", h.resolve("3") == "/items/3" && h.resolve("../about") == "/about" && h.resolve("#g") == "/items/2?x=1#g" && h.resolve("?y") == "/items/2?y")
+            expect("refuse other origins", h.resolve("https://example.com/") == null && h.resolve("//x/") == null)
+            // A deep link: the first history entry selects the startup entry.
+            host.stop()
+            val deep = Host(platform, listOf(NavigationFeature("/about")))
+            deep.start(); platform.advance(0)
+            expect("boot at /about opens About", deep.heading() == "About")
+            deep.stop()
+            host.start(); platform.advance(0)
+        }
     }
     println("final:\n" + show(host.tree.root))
     host.stop()

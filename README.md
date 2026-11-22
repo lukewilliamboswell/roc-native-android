@@ -94,6 +94,7 @@ Apps use two modules from the platform:
 | `Ui.button`, `Ui.button_s` | a button |
 | `Ui.text_field` | a one-line text field (`on_change`, `on_done`) |
 | `Ui.checkbox` | a checkbox |
+| `Ui.link` | a link: a tap gives your handler the URL, and you decide where to go (push it to history and show that page) |
 | `Ui.describe` | an accessibility description for any element |
 
 ## Examples
@@ -104,6 +105,7 @@ Apps use two modules from the platform:
 | [`todos`](examples/todos/Todos.roc) | a store, a table of rows with a filter, a text field and checkboxes; the list is saved and comes back when the app restarts |
 | [`stopwatch`](examples/stopwatch/main.roc) | a repeating timer that starts and stops with the app's state |
 | [`device`](examples/device/main.roc) | device facts: online, dark mode, languages, a local clock through the time zone, and a saved preference |
+| [`pages`](examples/pages/main.roc) | several pages with links between them, a page with a parameter, and the system back button |
 | [`http`](examples/http/main.roc) | an HTTPS request: loading, progress, status, network and timeout errors, retry and cancel |
 
 ## Limits

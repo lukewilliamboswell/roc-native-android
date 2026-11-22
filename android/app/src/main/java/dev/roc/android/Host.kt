@@ -68,8 +68,10 @@ class Host(private val platform: Platform, private val features: List<Feature> =
         check(RocEngine.nativeVersion() == PROTOCOL) { "engine speaks protocol ${RocEngine.nativeVersion()}, host $PROTOCOL" }
         declarations = Declarations(RocEngine.nativeKeys())
         // A deterministic startup program mounts on neutral facts (as the
-        // browser does) and samples the live ones with FX 22.
-        val facts = if (declarations.startupProfile == 1) BootFacts(declarations) else environment()
+        // browser does) and samples the live ones with FX 22; only the
+        // location stays, since the engine selects the entry from it.
+        val live = environment()
+        val facts = if (declarations.startupProfile == 1) BootFacts(declarations).also { it.url = live.url } else live
         applyBatch(RocEngine.nativeInit(encodeBoot(declarations, facts)))
         started = true
         for (f in features) f.started(this)
@@ -103,7 +105,7 @@ class Host(private val platform: Platform, private val features: List<Feature> =
     fun dispatch(target: Node, type: String, value: String = ""): Boolean {
         val (node, handler) = tree.route(target, type) ?: return false
         val bytes = when (handler.kind) {
-            10 -> CLICK // CLICK: modifier flags, not a link
+            10 -> clickPayload(target, tree.root) // CLICK: modifier flags and the nearest link (NavigationFeature.kt)
             5 -> byteArrayOf(if (value == "true") 1 else 0) // OPEN_STATE: checked
             1 -> value.toByteArray(Charsets.UTF_8) // TEXT
             else -> return false // pointer, key, scroll, files: not in this host yet

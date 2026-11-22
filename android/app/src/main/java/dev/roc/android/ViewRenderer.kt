@@ -29,7 +29,7 @@ class ViewRenderer(private val context: Context, private val host: () -> Host) :
     /** Set while the renderer writes a control, so its listener stays quiet. */
     private var writing = false
 
-    private val textTags = setOf("ui-title", "ui-text", "ui-button")
+    private val textTags = setOf("ui-title", "ui-text", "ui-button", "ui-link") // ui-link: navigation
 
     fun rootView(tree: Tree): View = viewFor(tree.root)!!
 
@@ -77,6 +77,14 @@ class ViewRenderer(private val context: Context, private val host: () -> Host) :
                 }
             })
             setOnEditorActionListener { _, _, _ -> host().dispatch(n, "done", text.toString()) }
+        }
+        // Navigation (NavigationFeature.kt): a link is link-coloured, underlined
+        // text; a tap is a click, whose payload carries the link's href.
+        n.tag == "ui-link" -> TextView(context).apply {
+            textSize = 18f
+            setTextColor(Color.rgb(0x1a, 0x5f, 0xb4))
+            paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+            setOnClickListener { click(n) }
         }
         n.tag in textTags -> TextView(context).apply {
             if (n.tag == "ui-title") { textSize = 28f; setTypeface(typeface, Typeface.BOLD) } else textSize = 18f
