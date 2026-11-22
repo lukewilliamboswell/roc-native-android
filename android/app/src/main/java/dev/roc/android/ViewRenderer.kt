@@ -122,6 +122,11 @@ class ViewRenderer(private val context: Context, private val host: () -> Host) :
                     override fun onStopTrackingTouch(bar: SeekBar) { host().dispatch(e, "change", bar.progress.toString()) }
                 })
             }
+            // Ui.file_picker (FilesFeature.kt): a button that opens the system file chooser.
+            e.tag == "input" && e.attr("type") == "file" -> Button(context).apply {
+                isAllCaps = false
+                setOnClickListener { host().let { h -> h.feature<FilesFeature>()?.pick(h, e) } }
+            }
             e.tag == "input" -> field(e)
             // Navigation (NavigationFeature.kt): a link is link-coloured,
             // underlined text; a tap is a click whose payload carries its href.
@@ -244,6 +249,7 @@ class ViewRenderer(private val context: Context, private val host: () -> Host) :
                     } else pad(v, e, if (e.parent == null) 16 else if (e.tag == "ui-card") 12 else 0)
                 }
             }
+            if (e.tag == "input" && e.attr("type") == "file" && v is Button) v.text = e.attr("label") ?: ""
         } finally {
             writing = false
         }

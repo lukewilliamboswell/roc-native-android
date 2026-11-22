@@ -103,6 +103,7 @@ Apps use these modules from the platform:
 | `Ui.link` | a link: a tap gives your handler the URL, and you decide where to go |
 | `Ui.text_field`, `Ui.text_field_with` | a one-line text field, with focus, blur, the keyboard's action key and key handlers |
 | `Ui.checkbox`, `Ui.switch`, `Ui.slider` | on/off controls and a slider |
+| `Ui.file_picker`, `Ui.file_picker_with` | a button that opens the system file chooser; your handler gets the chosen files as handles |
 | `Ui.fill`, `Ui.pad`, `Ui.selected`, `Ui.describe` | attributes: take the spare space, padding, a highlight, an accessibility description |
 
 Sizes are in dp. Any element with a click handler is tappable.
@@ -117,6 +118,7 @@ Sizes are in dp. Any element with a click handler is tappable.
 | [`device`](examples/device/main.roc) | device facts: online, dark mode, languages, a local clock through the time zone, and a saved preference |
 | [`pages`](examples/pages/main.roc) | several pages with links between them, a page with a parameter, and the system back button |
 | [`contacts`](examples/contacts/main.roc) | 10 000 contacts in a scrolling list that draws only what is on screen, a search field, keyboard shortcuts, and a detail card |
+| [`files`](examples/files/main.roc) | choosing a file with the system chooser: its name, size and type, a text preview, its SHA-256, and saving a copy |
 | [`ports`](examples/ports/main.roc) | calling Android from Roc through ports: device info, a Toast, the battery level and the accelerometer |
 | [`http`](examples/http/main.roc) | an HTTPS request: loading, progress, status, network and timeout errors, retry and cancel |
 
@@ -127,9 +129,9 @@ Sizes are in dp. Any element with a click handler is tappable.
   local storage (kept across restarts) and session storage (kept while the
   process lives); and device facts: online, visible, languages, time zone,
   and the media queries `prefers-color-scheme` and `prefers-reduced-motion`
-  (any other query reads false); and ports. Files and workers are not
-  supported yet: an app that asks for one stops with "unsupported effect
-  kind".
+  (any other query reads false); ports; and files (choose, read, digest,
+  save, upload and download). Workers are not supported yet: an app that
+  asks for one stops with "unsupported effect kind".
 - Input: taps, text entry with focus and blur, checkboxes, switches,
   sliders, the keyboard's action key and hardware keys on a focused control.
   No gestures (drag, long press, swipe) yet.

@@ -32,7 +32,7 @@ interface Renderer {
  * The host outlives any one view system: `renderer` can be replaced (an
  * activity recreated on rotation attaches a new one) without remounting.
  */
-class Host(private val platform: Platform, private val features: List<Feature> = emptyList()) {
+class Host(private val platform: Platform, val features: List<Feature> = emptyList()) {
     private val fxOwners = HashMap<Int, Feature>()
     private val opOwners = HashMap<Int, Feature>()
 
@@ -67,9 +67,10 @@ class Host(private val platform: Platform, private val features: List<Feature> =
      * One input waiting for its turn. A report (`source` set) waits for
      * its frame and is replaced by a newer report of its source while it
      * waits in the current epoch; an occurrence starts a new epoch, so the
-     * reports queued before it are delivered first, in order.
+     * reports queued before it are delivered first, in order. An occurrence
+     * whose engine call the caller makes (`turn`) carries it as `call`.
      */
-    private class Entry(val node: Int, val handler: Int, var payload: ByteArray, val source: Source?, val epoch: Int)
+    private class Entry(val node: Int, val handler: Int, var payload: ByteArray, val source: Source?, val epoch: Int, val call: (() -> ByteArray)? = null)
 
     /** A report source: one declaring element's handler for one type. */
     private data class Source(val element: Element, val type: String, val handler: Handler)
@@ -165,10 +166,30 @@ class Host(private val platform: Platform, private val features: List<Feature> =
     }
 
     /** Queue an occurrence: it starts a new epoch, behind every waiting report. */
-    private fun occurrence(node: Int, handler: Int, payload: ByteArray) {
+    private fun occurrence(node: Int, handler: Int, payload: ByteArray, call: (() -> ByteArray)? = null) {
         epoch++
-        queue.add(Entry(node, handler, payload, null, epoch))
+        queue.add(Entry(node, handler, payload, null, epoch, call))
     }
+
+    /**
+     * Queue a turn whose engine call the caller makes (a files-kind event,
+     * which stages handles first): `call` runs when no other batch is being
+     * applied and returns its command batch.
+     */
+    fun turn(call: () -> ByteArray) {
+        occurrence(0, 0, ByteArray(0), call)
+        drain()
+    }
+
+    /** As `answer`, with the caller making the engine call (see `turn`). */
+    fun answerTurn(id: Int, done: Boolean = true, call: () -> ByteArray) {
+        if (!live.containsKey(id)) return
+        if (done) live.remove(id)
+        turn(call)
+    }
+
+    /** The feature of type `T` this host was built with, if any. */
+    inline fun <reified T : Feature> feature(): T? = features.filterIsInstance<T>().firstOrNull()
 
     // ---- text controls ------------------------------------------------------
 
@@ -299,7 +320,7 @@ class Host(private val platform: Platform, private val features: List<Feature> =
                     if (waitingReports[source] === entry) waitingReports.remove(source)
                     if (!source.live()) continue
                 }
-                applyBatch(RocEngine.nativeEvent(entry.node, entry.handler, entry.payload))
+                applyBatch(entry.call?.invoke() ?: RocEngine.nativeEvent(entry.node, entry.handler, entry.payload))
                 if (reportDue) { frame = true; reportDue = false }
             }
         } finally {
@@ -319,6 +340,7 @@ class Host(private val platform: Platform, private val features: List<Feature> =
         val effects = tree.effects.toList()
         val ack = tree.startupAck
         for (e in effects) perform(e)
+        for (f in features) f.applied(this)
         // The cold batch is applied and its effects started: acknowledge it.
         if (ack) occurrence(FX_NODE, 0, byteArrayOf(254.toByte()))
     }

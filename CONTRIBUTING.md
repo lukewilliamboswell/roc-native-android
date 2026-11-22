@@ -38,7 +38,8 @@ feature supplying its own facts.
 - **This project's**:
   - `platform/main.roc`: the platform root.
   - `platform/Ui.roc`: the native vocabulary.
-  - `host/host.zig`: the JNI host.
+  - `host/host.zig`: the JNI host, with `host/resources.zig` (the file-handle
+    heap, copied from roc-signals' host).
   - `android/`: the Kotlin host and the app shell.
 - **No glue file**: the Roc↔host boundary is a handful of functions over
   `List(U8)`, a `Box` and `U32`, so a handwritten `extern struct` covers it.
@@ -122,6 +123,17 @@ the emulator refuses to start for lack of disk space, run
   subscriptions deliver one message per turn. Command failures and `UNSENT`
   go to logcat. Not yet: files in port messages, push ports, per-port
   counters.
+- **Files** (`roc_engine_files`, FX 11–15, op 20; `FilesFeature.kt`,
+  `AndroidFiles.kt`): the app holds a handle, never a file's bytes.
+  `host.zig` mints `Box(U64)` handles in its blob heap (`RocFiles.nativeStage`)
+  and delivers the file record through `roc_engine_files`. After each batch
+  the host drains released tokens and lets their files go. FX 11 reads a
+  range as bytes or text (bounded by `max_bytes` and 256 MiB). FX 13 is
+  SHA-256. SAVE uses `ACTION_CREATE_DOCUMENT`. FX 14 answers the file's
+  `content://` URI, or for part of a file a `file://` URI of a cached copy.
+  FX 12/15 (upload and download) use a small client of their own, without
+  progress, cache or credentials policies. Not yet: drop and paste of files,
+  persisted Uri permissions.
 - **HTTP** (FX 1, `HttpFeature.kt`): `HttpURLConnection` on a background
   pool, with answers, timeouts and progress (tag 26, receiving only) delivered
   on the engine thread. CANCEL disconnects and nothing is answered after it.

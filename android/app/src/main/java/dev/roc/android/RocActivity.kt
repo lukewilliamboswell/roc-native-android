@@ -3,6 +3,7 @@ package dev.roc.android
 import android.app.Activity
 import android.os.Build
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
@@ -49,6 +50,11 @@ abstract class RocActivity : Activity() {
     // Visibility (FX 7): the engine's page is visible while its activity is started.
     override fun onStart() { super.onStart(); runtime.visible.set(true) }
     override fun onStop() { runtime.visible.set(false); super.onStop() }
+    @Deprecated("Activity results are how the file chooser answers")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        runtime.activityResult(requestCode, resultCode, data)
+    }
 
     override fun onDestroy() {
         back?.disarm()
@@ -109,3 +115,4 @@ class PortsActivity : RocActivity() {
     override fun portServices(app: Context) = devicePorts(app)
 }
 class ContactsActivity : RocActivity() { override val library = "contacts" }
+class FilesActivity : RocActivity() { override val library = "files" }

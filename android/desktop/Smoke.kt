@@ -130,7 +130,7 @@ fun main(args: Array<String>) {
     if (args[1] == "ports") { portJsonCase(); refusesBadServices(platform) }
     // Port services must match the app's declared ports, so only `ports` gets them.
     val ports = if (args[1] == "ports") listOf(fakes.feature()) else emptyList()
-    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature() + navigation + ports)
+    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature() + navigation + ports + filesSmokeFeatures(args[1]))
     renderer.host = host
     host.renderer = renderer
     host.start()
@@ -216,6 +216,7 @@ fun main(args: Array<String>) {
             host.start(); platform.advance(0)
         }
         "ports" -> portsCase(host, platform, fakes)
+        "files" -> filesSmoke(host, platform) // FilesSmoke.kt
     }
     println("final:\n" + show(host.tree.root))
     host.stop()
