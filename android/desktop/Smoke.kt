@@ -102,7 +102,11 @@ fun main(args: Array<String>) {
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
     val navigation = NavigationFeature() // history and back (pages)
-    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature() + navigation)
+    val fakes = PortFakes()
+    if (args[1] == "ports") { portJsonCase(); refusesBadServices(platform) }
+    // Port services must match the app's declared ports, so only `ports` gets them.
+    val ports = if (args[1] == "ports") listOf(fakes.feature()) else emptyList()
+    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature() + navigation + ports)
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -185,6 +189,7 @@ fun main(args: Array<String>) {
             deep.stop()
             host.start(); platform.advance(0)
         }
+        "ports" -> portsCase(host, platform, fakes)
     }
     println("final:\n" + show(host.tree.root))
     host.stop()

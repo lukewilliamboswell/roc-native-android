@@ -31,8 +31,9 @@ feature supplying its own facts.
 
 - **Verbatim from roc-signals** (`platform/`): `Core`, `Engine`,
   `SignalCore`, `TableCore`, `View`, `Seq`, `Layout`, `EntryRoutes`,
-  `ReadyIndex`, `Url`, `Spelling`, `MarkupAdvice`, `Web`. Never edit these
-  here. `Web` and the `parser` package are present only because the engine
+  `ReadyIndex`, `Url`, `Spelling`, `MarkupAdvice`, `Web`, and for ports
+  `Port`, `PortJson`, `PortJsonBody`, `PortRegistry`, `Wire` and
+  `WorkerCodec` (which brings the `cbor` package). Never edit these here. `Web` and the `parser` package are present only because the engine
   imports them.
 - **This project's**:
   - `platform/main.roc`: the platform root.
@@ -113,6 +114,14 @@ the emulator refuses to start for lack of disk space, run
   decides whether to navigate; nothing happens by default). The launching
   Intent's path is the first entry (deep links). History is not saved
   across process death.
+- **Ports** (op 19, op 27, FX 9, FX 10, declaration section 5;
+  `PortsFeature.kt`, `PortServices.kt`, `PortJson.kt`): these follow the
+  browser runtime. The catalogue is checked at mount: a declared port
+  without a Kotlin service of its shape, or a service for an undeclared
+  port, refuses to mount. Calls answer once or time out. `Latest`/`Every(n)`
+  subscriptions deliver one message per turn. Command failures and `UNSENT`
+  go to logcat. Not yet: files in port messages, push ports, per-port
+  counters.
 - **HTTP** (FX 1, `HttpFeature.kt`): `HttpURLConnection` on a background
   pool, with answers, timeouts and progress (tag 26, receiving only) delivered
   on the engine thread. CANCEL disconnects and nothing is answered after it.

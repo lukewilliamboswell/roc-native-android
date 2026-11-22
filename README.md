@@ -78,12 +78,17 @@ phone can load.
 
 ## Writing an app
 
-Apps use two modules from the platform:
+Apps use these modules from the platform:
 
 - **`Engine`**: state, signals, the shared store, tables, effects and entry
   routes. It is the same engine as roc-signals, so its
   [guide](https://lukewilliamboswell.github.io/roc-signals/docs/guide/)
   applies. Read "Ui" where it says "Html".
+- **`Port`**: typed messages to services written in Kotlin, which is how an
+  app reaches the rest of Android (sensors, notifications, the camera)
+  without changes to the engine. An app's activity supplies its services by
+  overriding `RocActivity.portServices`; see
+  [`DevicePorts.kt`](android/app/src/main/java/dev/roc/android/DevicePorts.kt).
 - **`Ui`**: the screens. Each builder becomes one Android view:
 
 | Builder | View |
@@ -106,6 +111,7 @@ Apps use two modules from the platform:
 | [`stopwatch`](examples/stopwatch/main.roc) | a repeating timer that starts and stops with the app's state |
 | [`device`](examples/device/main.roc) | device facts: online, dark mode, languages, a local clock through the time zone, and a saved preference |
 | [`pages`](examples/pages/main.roc) | several pages with links between them, a page with a parameter, and the system back button |
+| [`ports`](examples/ports/main.roc) | calling Android from Roc through ports: device info, a Toast, the battery level and the accelerometer |
 | [`http`](examples/http/main.roc) | an HTTPS request: loading, progress, status, network and timeout errors, retry and cancel |
 
 ## Limits
@@ -115,8 +121,9 @@ Apps use two modules from the platform:
   local storage (kept across restarts) and session storage (kept while the
   process lives); and device facts: online, visible, languages, time zone,
   and the media queries `prefers-color-scheme` and `prefers-reduced-motion`
-  (any other query reads false). Files, workers and ports are not supported
-  yet: an app that asks for one stops with "unsupported effect kind".
+  (any other query reads false); and ports. Files and workers are not
+  supported yet: an app that asks for one stops with "unsupported effect
+  kind".
 - Input is limited to taps, text entry, checkboxes and the keyboard's action
   key.
 - arm64 devices and emulators only.
