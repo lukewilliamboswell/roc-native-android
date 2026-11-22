@@ -1,6 +1,7 @@
 package dev.roc.android
 
 import android.app.Activity
+import android.content.Context
 import android.os.Bundle
 import android.view.WindowInsets
 import android.widget.ScrollView
@@ -12,6 +13,13 @@ import android.widget.ScrollView
  */
 abstract class RocActivity : Activity() {
     abstract val library: String
+
+    /**
+     * The services behind the ports the app declares, by port name (see
+     * `PortsFeature`). Asked once, when the engine mounts; they outlive this
+     * activity, so they hold `app`, never the activity.
+     */
+    open fun portServices(app: Context): Map<String, PortService> = emptyMap()
 
     private lateinit var runtime: RocRuntime
 
@@ -48,3 +56,7 @@ abstract class RocActivity : Activity() {
 class CounterActivity : RocActivity() { override val library = "counter" }
 class TodosActivity : RocActivity() { override val library = "todos" }
 class StopwatchActivity : RocActivity() { override val library = "stopwatch" }
+class PortsActivity : RocActivity() {
+    override val library = "ports"
+    override fun portServices(app: Context) = devicePorts(app)
+}

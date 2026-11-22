@@ -26,7 +26,10 @@ Android widgets (no WebView).
   `TableCore`, `View`, `Seq`, `Layout`, `EntryRoutes`, `ReadyIndex`, `Url`,
   `Spelling`, `MarkupAdvice`, `Web`. `Web` and the `parser` package are there
   only because the engine imports them (it checks element/attribute names);
-  apps never see them.
+  apps never see them. `Port` (the typed port layer apps use), with
+  `PortJson`, `PortJsonBody`, `PortRegistry`, and `Wire` and `WorkerCodec`
+  (which `PortJson` imports, and which bring the `cbor` package), are copied
+  verbatim too.
 - **New**:
   - `platform/Ui.roc`: the native vocabulary (`column`, `row`, `list`,
     `title`, `text`, `button`, `text_field`, `checkbox`, …), one engine
@@ -47,6 +50,7 @@ Android widgets (no WebView).
 | `examples/counter` | local state, signals into text, `Engine.when` |
 | `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
 | `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| `examples/ports` | ports to Kotlin services (`DevicePorts.kt`): a call (device info, with a timeout), a command (a Toast) and two subscriptions (the battery, `Every(4)`; the accelerometer, `Latest`, held while a switch is on) |
 
 Each example is its own launcher icon, with its own process and task, because a
 library holds one engine and every app exports the same JNI names.
@@ -109,8 +113,17 @@ emulator refuses to start for lack of disk space, run
 
 - The host implements only what the examples need: element, text, template
   and row commands, LISTEN, PROP value/checked, timers and intervals,
-  startup ack and opportunity. Other effects (HTTP, storage, workers, ports)
+  startup ack and opportunity. Other effects (HTTP, storage, workers)
   stop with "unsupported effect kind". NAV and STORAGE writes are ignored.
+- Ports (`PortsFeature.kt`) follow the browser runtime: the catalogue is
+  checked at mount (a declared port without a Kotlin service of its shape,
+  or a service for an undeclared port, refuses to mount), calls answer once
+  or time out, `Latest`/`Every(n)` subscriptions deliver one message per
+  turn, and command failures and `UNSENT` go to logcat. An example supplies
+  its services by overriding `RocActivity.portServices`. Not yet: files in
+  port messages (answers carry none; a request whose message carries files
+  is refused with `Threw`, or a fault for a command), `emitPort`-style push
+  ports, and the runtime's per-port counters.
 - Events: click, input, change (checkbox), and `done` (keyboard action).
 - A Roc crash ends the process through JNI `FatalError` (the message goes to
   logcat). Boot bytes are empty: fallback entry, no storage or environment.

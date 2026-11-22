@@ -70,7 +70,9 @@ fun main(args: Array<String>) {
     System.load(File(args[0]).absolutePath)
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
-    val host = Host(platform)
+    val fakes = PortFakes()
+    if (args[1] == "ports") { portJsonCase(); refusesBadServices(platform) }
+    val host = Host(platform, if (args[1] == "ports") listOf(fakes.feature()) else emptyList())
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -125,6 +127,7 @@ fun main(args: Array<String>) {
             host.dispatch(host.button("Reset"), "click")
             expect("reset", text().contains("0:00.0") && !text().contains("Lap 1"))
         }
+        "ports" -> portsCase(host, platform, fakes)
     }
     println("final:\n" + show(host.tree.root))
     host.stop()

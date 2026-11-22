@@ -5,6 +5,9 @@
 ## stream it emits in the browser; the Kotlin host (`android/`) applies it to
 ## Android Views. `Web.roc` and the parser package remain only because the
 ## verbatim engine imports them (it checks element and attribute names).
+## `Port.roc` (with `PortJson`, `PortJsonBody`, `PortRegistry`, and `Wire`
+## and `WorkerCodec`, which `PortJson` imports, with the cbor package) is
+## the typed layer for services the Kotlin host supplies.
 ##
 ## - `roc build --target=arm64musl` gives `libapp.so` for an arm64 Android
 ##   device or emulator (`../host/host.zig`, built by `build-host.sh`, freestanding, no libc).
@@ -14,8 +17,8 @@ platform ""
 	requires {
 		[Store : st] for main : Engine.Program(st)
 	}
-	exposes [Engine, Ui]
-	packages { parser: "https://github.com/lukewilliamboswell/roc-parser/releases/download/6.0.0-rc.5/822J9njyNR1vgyX1KG4ck496dBx3AnLfvn2zHXn15Ksw.tar.zst" }
+	exposes [Engine, Port, PortJson, Ui]
+	packages { cbor: "https://github.com/lukewilliamboswell/roc-cbor/releases/download/0.6.3/J3xX4n61WoMZKK3tdWTnZBdKaVbi8SvXvmtC5i3qDAER.tar.zst", parser: "https://github.com/lukewilliamboswell/roc-parser/releases/download/6.0.0-rc.5/822J9njyNR1vgyX1KG4ck496dBx3AnLfvn2zHXn15Ksw.tar.zst" }
 	provides {
 		"roc_engine_drop": drop_for_host,
 		"roc_engine_event": event_for_host,
@@ -31,6 +34,8 @@ platform ""
 
 import Core
 import Engine
+import Port
+import PortJson
 import Ui
 
 ## One host call's result: the state (owned by the host until the next call),

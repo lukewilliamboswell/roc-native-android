@@ -11,6 +11,10 @@ import android.util.Log
  * one here to enable it.
  */
 fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
+    // Ports: the services the example's activity supplies (`RocActivity.portServices`).
+    PortsFeature(onFault = { port, kind, message -> Log.w("roc", "port fault [$kind] \"$port\": $message") }) {
+        (runtime.activity as? RocActivity)?.portServices(app) ?: emptyMap()
+    },
 )
 
 /**
