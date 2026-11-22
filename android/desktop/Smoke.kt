@@ -1,0 +1,132 @@
+// Desktop smoke test: loads an example's macOS .dylib (the same Roc app and
+// Zig JNI host as the Android .so) into a plain JVM and drives it through
+// the same Tree/Host code the Android app uses, with a manual clock.
+//
+//   kotlinc ../app/src/main/java/dev/roc/android/{Tree,Host,RocEngine}.kt Smoke.kt -include-runtime -d smoke.jar
+//   java -Djava.library.path=. -jar smoke.jar build/libcounter.dylib counter
+
+import dev.roc.android.*
+import java.io.File
+
+class ManualPlatform : Platform {
+    var now = 0L
+    private var seq = 0
+    private val pending = sortedMapOf<Pair<Long, Int>, () -> Unit>(compareBy({ it.first }, { it.second }))
+    override fun nowMs() = now
+    override fun schedule(ms: Long, task: () -> Unit): () -> Unit {
+        val key = (now + ms) to seq++
+        pending[key] = task
+        return { pending.remove(key) }
+    }
+    override fun log(text: String) = println("dbg: $text")
+    override fun title(text: String) = println("title: $text")
+
+    fun advance(ms: Long) {
+        val end = now + ms
+        while (true) {
+            val next = pending.keys.firstOrNull()?.takeIf { it.first <= end } ?: break
+            now = next.first
+            pending.remove(next)!!()
+        }
+        now = end
+    }
+}
+
+class CountingRenderer : Renderer {
+    var renders = 0
+    var lastDirty = 0
+    override fun render(tree: Tree) { renders++; lastDirty = tree.dirty.size }
+}
+
+fun show(n: Node, indent: String = ""): String = when (n) {
+    is TextNode -> "$indent\"${n.text}\"\n"
+    is Comment -> ""
+    is Element -> {
+        val attrs = n.attrs.entries.joinToString("") { " ${it.key}=\"${it.value}\"" } +
+            (if (n.tag == "input") " .value=\"${n.value}\" .checked=${n.checked}" else "") +
+            (if (n.handlers.isNotEmpty()) " on=${n.handlers.keys}" else "")
+        "$indent<${n.tag}$attrs>\n" + n.children.joinToString("") { show(it, "$indent  ") }
+    }
+}
+
+fun all(n: Node): Sequence<Node> = sequence {
+    yield(n)
+    if (n is Element) for (c in n.children.toList()) yieldAll(all(c))
+}
+
+fun Host.find(pred: (Element) -> Boolean): Element =
+    all(tree.root).filterIsInstance<Element>().first(pred)
+
+fun Host.button(text: String) = find { it.tag == "ui-button" && it.textContent() == text }
+fun Host.rows() = all(tree.root).filterIsInstance<Element>().filter { it.tag == "ui-row" && it.parent?.tag == "ui-list" }.toList()
+
+var failures = 0
+fun expect(label: String, ok: Boolean) {
+    println((if (ok) "  ok   " else "  FAIL ") + label)
+    if (!ok) failures++
+}
+
+fun main(args: Array<String>) {
+    System.load(File(args[0]).absolutePath)
+    val platform = ManualPlatform()
+    val renderer = CountingRenderer()
+    val host = Host(platform, renderer)
+    host.start()
+    platform.advance(0)
+    println("mounted:\n" + show(host.tree.root))
+    val text = { host.tree.root.textContent() }
+
+    when (args[1]) {
+        "counter" -> {
+            expect("starts at 0", text().contains("Count: 0"))
+            host.dispatch(host.button("+"), "click")
+            host.dispatch(host.button("+"), "click")
+            expect("two increments", text().contains("Count: 2"))
+            expect("one text changed, one element dirty", renderer.lastDirty == 1)
+            repeat(3) { host.dispatch(host.button("-"), "click") }
+            expect("below zero shows warning", text().contains("Count: -1") && text().contains("Below zero!"))
+            host.dispatch(host.button("Reset"), "click")
+            expect("reset hides warning", text().contains("Count: 0") && !text().contains("Below zero!"))
+        }
+        "todos" -> {
+            val input = host.find { it.tag == "input" && it.attr("type") == "text" }
+            host.dispatch(input, "input", "Buy milk")
+            host.dispatch(host.button("Add"), "click")
+            host.dispatch(input, "input", "Water plants")
+            host.dispatch(input, "done", "Water plants") // the keyboard's action key
+            println(show(host.tree.root))
+            expect("two rows", host.rows().size == 2)
+            expect("draft cleared", input.value == "")
+            expect("2 items left", text().contains("2 items left"))
+            val box = host.find { it.tag == "input" && it.attr("type") == "checkbox" }
+            host.dispatch(box, "change", "true")
+            expect("checkbox checked", box.checked)
+            expect("1 item left", text().contains("1 item left"))
+            host.dispatch(host.button("Show open"), "click")
+            expect("open filter hides the done row", !text().contains("Buy milk") && text().contains("Water plants"))
+            host.dispatch(host.button("Show all"), "click")
+            val remove = host.find { it.tag == "ui-button" && it.attr("description") == "Remove Buy milk" }
+            host.dispatch(remove, "click")
+            expect("removed one row", host.rows().size == 1 && !text().contains("Buy milk"))
+        }
+        "stopwatch" -> {
+            expect("starts at 0:00.0", text().contains("0:00.0"))
+            host.dispatch(host.button("Start"), "click")
+            platform.advance(1250)
+            expect("12 ticks after 1.25 s", text().contains("0:01.2"))
+            host.dispatch(host.button("Lap"), "click")
+            platform.advance(500)
+            host.dispatch(host.button("Stop"), "click")
+            val stopped = text()
+            platform.advance(5000)
+            expect("stop cancels the interval", text() == stopped && stopped.contains("0:01.7"))
+            expect("lap recorded", stopped.contains("Lap 1: 0:01.2"))
+            host.dispatch(host.button("Reset"), "click")
+            expect("reset", text().contains("0:00.0") && !text().contains("Lap 1"))
+        }
+    }
+    println("final:\n" + show(host.tree.root))
+    host.stop()
+    println(if (failures == 0) "PASS ${args[1]}" else "FAILED ${args[1]}: $failures")
+    if (failures != 0) kotlin.system.exitProcess(1)
+}
