@@ -41,6 +41,8 @@ class Element(val tag: String) : Node() {
     val handlers = mutableMapOf<String, Handler>()
     var value: String = ""
     var checked: Boolean = false
+    /** Properties 3–5 (pointer zone, keymaps), by index, as rendered. */
+    val props = HashMap<Int, String>()
 
     fun attr(name: String): String? = attrs[name]
     val classes: List<String> get() = (attrs["class"] ?: "").split(' ').filter { it.isNotEmpty() }
@@ -51,6 +53,7 @@ class Element(val tag: String) : Node() {
         e.handlers.putAll(handlers)
         e.value = value
         e.checked = checked
+        e.props.putAll(props)
         for (c in children) e.append(c.copy())
         return e
     }
@@ -76,7 +79,8 @@ sealed class Effect(val id: Int) {
     class Cancel(id: Int) : Effect(id)
     class Opportunity(val request: Boolean, val generation: Long) : Effect(0)
     class Title(val text: String) : Effect(0)
-    class Focus(val node: Node) : Effect(0)
+    /** A REF command on a node (focus, blur, select, apply value, scroll). */
+    class Reference(val ref: Ref) : Effect(0)
 }
 
 class Template(val root: Node, val holes: List<Hole>)
@@ -207,7 +211,8 @@ class Tree(
         when (prop) {
             1 -> e.value = value
             2 -> e.checked = value == "true"
-            else -> {} // keymaps, pointer zones, dialogs, inner_html: not in this spike
+            3, 4, 5 -> e.props[prop] = value // pointer zone, keymap_down, keymap_up
+            else -> {} // dialogs, popovers, inner_html: not in this spike
         }
         touch(e)
     }
@@ -321,11 +326,16 @@ class Tree(
                 17 -> effects += Effect.Title(r.str())
                 18 -> { // REF
                     val o = r.u8(); val n = lookup(r.u32())
-                    when (o) {
-                        1, 3, 5 -> effects += Effect.Focus(n)
-                        6 -> { r.u8(); r.u8(); r.u8() }
-                        7 -> { repeat(2) { if (r.u8() == 3) r.u32() }; r.u8() }
-                    }
+                    effects += Effect.Reference(when (o) {
+                        1, 2, 3, 4, 5 -> Ref(o, n)
+                        6 -> Ref(o, n, block = r.u8(), inline = r.u8(), behavior = r.u8())
+                        7 -> {
+                            fun edge(): Edge { val t = r.u8(); return if (t == 3) Edge(3, r.u32()) else Edge(t) }
+                            val top = edge(); val left = edge()
+                            Ref(o, n, top = top, left = left, behavior = r.u8())
+                        }
+                        else -> error("executor: unknown REF op $o")
+                    })
                 }
                 21 -> { val n = lookup(r.u32()); val p = r.u8(); setProp(n, p, r.str()) } // PROP
                 22 -> { // HPROP
@@ -351,15 +361,35 @@ class Tree(
      * `type` at or above `target`, then the nearest routing id at or above
      * the element that declared it. Null when nothing listens.
      */
-    fun route(target: Node, type: String): Pair<Int, Handler>? {
+    fun route(target: Node, type: String): Pair<Int, Handler>? =
+        routeAt(target, type)?.let { it.node to it.handler }
+
+    /** A routed event: the routing id, the handler and the element that declared it. */
+    class Routed(val node: Int, val handler: Handler, val declaring: Element)
+
+    /**
+     * As `route`, keeping the declaring element. `accept` can pass over a
+     * handler (a key handler whose keymap does not hear the key).
+     */
+    fun routeAt(target: Node, type: String, accept: (Element, Handler) -> Boolean = { _, _ -> true }): Routed? {
         var n: Node? = target
         var handler: Handler? = null
+        var declaring: Element? = null
         while (n != null) {
-            if (handler == null && n is Element) handler = n.handlers[type]
-            if (handler != null && n.routing != null) return n.routing!! to handler
+            if (handler == null && n is Element) {
+                val h = n.handlers[type]
+                if (h != null && accept(n, h)) { handler = h; declaring = n }
+            }
+            if (handler != null && n.routing != null) return Routed(n.routing!!, handler, declaring!!)
             n = n.parent
         }
         return null
+    }
+
+    /** Whether `n` is still in this tree (a removed node gets no event). */
+    fun attached(n: Node): Boolean {
+        var x: Node = n
+        while (true) x = x.parent ?: return x === root
     }
 
     fun clearMarks() {

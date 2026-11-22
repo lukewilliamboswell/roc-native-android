@@ -3,7 +3,6 @@ package dev.roc.android
 import android.app.Activity
 import android.os.Bundle
 import android.view.WindowInsets
-import android.widget.ScrollView
 
 /**
  * Shows one Roc app: attaches views to the process's mounted engine
@@ -21,17 +20,17 @@ abstract class RocActivity : Activity() {
         runtime.activity = this
         val host = runtime.host
         val renderer = ViewRenderer(this) { host }
-        val scroll = ScrollView(this).apply { addView(renderer.rootView(host.tree)) }
+        val screen = renderer.screen(host.tree)
         host.renderer = renderer
         // Android 15+ draws apps edge to edge: keep content clear of the
         // status and navigation bars and the keyboard. (No action bar: the
         // app draws its own title with Ui.title.)
-        scroll.setOnApplyWindowInsetsListener { v, insets ->
+        screen.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
-        setContentView(scroll)
+        setContentView(screen)
     }
 
     override fun onDestroy() {
@@ -48,3 +47,4 @@ abstract class RocActivity : Activity() {
 class CounterActivity : RocActivity() { override val library = "counter" }
 class TodosActivity : RocActivity() { override val library = "todos" }
 class StopwatchActivity : RocActivity() { override val library = "stopwatch" }
+class ContactsActivity : RocActivity() { override val library = "contacts" }

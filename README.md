@@ -29,8 +29,9 @@ Android widgets (no WebView).
   apps never see them.
 - **New**:
   - `platform/Ui.roc`: the native vocabulary (`column`, `row`, `list`,
-    `title`, `text`, `button`, `text_field`, `checkbox`, …), one engine
-    element per View.
+    `card`, `scroll`, `rows`, `title`, `text`, `label`, `button`, `text_field`,
+    `checkbox`, `switch`, `slider`, …), one engine element per View, with
+    the attributes the renderer reads (`fill`, `pad`, `tone`, `size`, …).
   - `platform/main.roc`: the platform root, a slimmed roc-signals root with
     mount, event and drop only.
   - `host/host.zig`: the JNI host. It is freestanding, with no libc
@@ -47,6 +48,7 @@ Android widgets (no WebView).
 | `examples/counter` | local state, signals into text, `Engine.when` |
 | `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
 | `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| `examples/contacts` | 10 000 rows in a windowed `table_view` inside `Ui.scroll`, following paced scroll and size reports; a search field with focus/blur, a keymap (Escape, arrows) and `Focus`/`Blur`/`ApplyValue`/`ScrollTo`; row taps and a switch |
 
 Each example is its own launcher icon, with its own process and task, because a
 library holds one engine and every app exports the same JNI names.
@@ -57,7 +59,7 @@ library holds one engine and every app exports the same JNI names.
 host/host.zig        the JNI host (Zig), built into each target's libhost.a
 platform/main.roc    the platform root, Ui.roc and the verbatim engine
 platform/targets/    host outputs, built by build-host.sh, never committed
-examples/            the three apps, depending on the working tree
+examples/            the apps, depending on the working tree
 android/             the Kotlin host and app shell (not part of the bundle)
 ```
 
@@ -108,10 +110,31 @@ emulator refuses to start for lack of disk space, run
 ## Spike limits
 
 - The host implements only what the examples need: element, text, template
-  and row commands, LISTEN, PROP value/checked, timers and intervals,
+  and row commands, LISTEN, PROP value/checked/keymaps, REF, timers and intervals,
   startup ack and opportunity. Other effects (HTTP, storage, workers, ports)
   stop with "unsupported effect kind". NAV and STORAGE writes are ignored.
-- Events: click, input, change (checkbox), and `done` (keyboard action).
+- Events: click (on buttons and on any element with a click handler),
+  input, change (checkbox, switch, slider), `done` (keyboard action),
+  `focus`/`blur` (carrying the control's text), keys (KIND_KEY through
+  rendered keymaps, PROP 4/5) and the layout reports scroll and size
+  (KIND_SCROLL/KIND_SIZE, dp, paced to one per source per frame through
+  the host's report queue). No pointer, files, seen or document-key
+  (`on_document_key`) events yet.
+- Keys come from hardware keyboards on focusable views (Enter, Escape,
+  arrows, Tab, Backspace, Delete, Page/Home/End, printable keys); the soft
+  keyboard's action key is Enter (keydown and keyup) and then `done`. A
+  keymap entry's `prevent` keeps the view's default from running.
+- Controlled text: a changed value waits while the field is focused and is
+  applied on blur, as in the browser. Focus stands in for IME composition
+  (an IME composes only in the focused view), and `ApplyValue` applies at
+  once even while composing (writing the text restarts the IME's input).
+- REF: focus, blur, focus and select, apply value, focus without scrolling,
+  scroll into view (vertical alignment only) and scroll to (`top` only, on
+  a `Ui.scroll`).
+- Layout: the page scrolls as a whole (a root `ScrollView`) until a
+  `Ui.scroll` is on screen, which then owns scrolling and takes its column's
+  spare height. Nested scrolling and horizontal scrolling are not
+  supported. Windowed lists need fixed row heights (`Ui.rows`). No images.
 - A Roc crash ends the process through JNI `FatalError` (the message goes to
   logcat). Boot bytes are empty: fallback entry, no storage or environment.
 - arm64 only.
