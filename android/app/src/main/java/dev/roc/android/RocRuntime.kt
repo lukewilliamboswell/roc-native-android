@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 
 /**
@@ -100,6 +102,7 @@ class RocRuntime private constructor(app: Context, val library: String, launchUr
         fun obtain(activity: Activity, library: String): RocRuntime {
             current?.let { return it }
             System.loadLibrary(library)
+            RocEngine.nativePageSize(Os.sysconf(OsConstants._SC_PAGESIZE).toInt())
             val runtime = RocRuntime(activity.applicationContext, library, launchUrl(activity))
             current = runtime
             runtime.activity = activity

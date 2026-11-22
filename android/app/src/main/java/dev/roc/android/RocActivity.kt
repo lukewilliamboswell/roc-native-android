@@ -116,3 +116,10 @@ class PortsActivity : RocActivity() {
 }
 class ContactsActivity : RocActivity() { override val library = "contacts" }
 class FilesActivity : RocActivity() { override val library = "files" }
+
+/**
+ * The activity of an app built with `android.roc`: its Roc app is `libapp.so`,
+ * and its manifest (written by the tool) names this class. Ports need
+ * Kotlin services, which a tool-built app cannot supply yet.
+ */
+class AppActivity : RocActivity() { override val library = "app" }

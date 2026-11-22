@@ -55,7 +55,11 @@ from inside a turn. The host is built single-threaded and must stay so.
 ## The JNI boundary
 
 The JNI exports in `host/host.zig` and the `external fun`s in `RocEngine.kt`
-and `FilesFeature.kt` change together. A Roc list's capacity field stores the
+and `FilesFeature.kt` change together. The Kotlin host passes the page size (`nativePageSize`) right after
+loading the library. A non-debuggable app cannot read `/proc/self/auxv`, and
+without the page size Zig's page allocator corrupts its mappings, so test a
+change to start-up with a non-debuggable APK (`android.roc`'s), not only
+Gradle's debug build. A Roc list's capacity field stores the
 capacity shifted left one bit, and the refcount (`usize` 1) sits before the
 elements. Build lists through the host's helpers, never by hand.
 

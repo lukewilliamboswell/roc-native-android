@@ -18,7 +18,7 @@ import src/Repo
 ##
 ## - `pins`: only the scripts pin a compiler, and they pin `roc-stable`.
 ## - `engine`: the engine modules match their recorded roc-signals digests.
-## - `fmt`: `roc fmt --check` over the platform and examples, and
+## - `fmt`: `roc fmt --check` over the platform, examples and tool, and
 ##   `roc-stable fmt --check` over the scripts.
 ## - `scripts`: the scripts' `expect` tests.
 ## - `build`: `scripts/build.roc`: the host, then every example for both
@@ -119,17 +119,17 @@ engine! = || {
 
 fmt! : () => Try(List(Str), _)
 fmt! = || {
-	sources = tracked!(["platform", "examples"])?.keep_if(|path| path.ends_with(".roc"))
+	sources = tracked!(["platform", "examples", "cli"])?.keep_if(|path| path.ends_with(".roc"))
 	sources_fmt = run!("roc", ["fmt", "--check"].concat(sources))?
 	scripts_fmt = run!("roc-stable", ["fmt", "--check"].concat(tracked!(["scripts"])?.keep_if(|path| path.ends_with(".roc"))))?
-	note!("${sources.len().to_str()} platform and example sources checked")
+	note!("${sources.len().to_str()} platform, example and tool sources checked")
 	Ok(sources_fmt.concat(scripts_fmt))
 }
 
 scripts! : () => Try(List(Str), _)
 scripts! = || {
 	var $problems = []
-	for script in ["scripts/check_all.roc", "scripts/build.roc", "scripts/bundle.roc"] {
+	for script in ["scripts/check_all.roc", "scripts/build.roc", "scripts/bundle.roc", "scripts/release.roc"] {
 		$problems = $problems.concat(run!("roc-stable", ["test", script])?)
 	}
 	Ok($problems)

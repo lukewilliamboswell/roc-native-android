@@ -37,42 +37,54 @@ Tapping "+" changes one text view; nothing else is redrawn.
 
 You need:
 
-- **Roc**: the 0.1.0 release candidate or a recent nightly.
-- **Android Studio**: it brings the SDK and an emulator. Create an **arm64**
-  device (API 26 or later). Apps are built for arm64 only.
-- **Zig**: only while the platform is built from source. A published
-  platform release will carry its native parts, and Zig won't be needed.
+- **Roc** as `roc` on your PATH: the 0.1.0 release candidate or a recent
+  nightly.
+- **Android Studio**, which installs the Android SDK and an emulator. In its
+  Device Manager, create an **arm64** device (API 26 or later), or connect an
+  arm64 phone with USB debugging on. Apps are built for arm64 only.
 
-There is no published release yet, so start from this repository:
-
-```sh
-git clone https://github.com/lukewilliamboswell/roc-native-android
-cd roc-native-android/android
-printf 'roc.exe=%s\nzig.exe=%s\n' "$(which roc)" "$(which zig)" >> local.properties
-./gradlew installDebug
-```
-
-Or open `android/` in Android Studio and press **Run**. The first build takes
-a few minutes. After that, only the apps you changed are rebuilt.
-
-Each app in `examples/` gets its own launcher icon. To start your own, copy
-an example to `examples/<name>/main.roc`. Gradle finds it automatically. For
-now you also add a one-line activity for it, in
-`android/app/src/main/java/dev/roc/android/RocActivity.kt` and
-`AndroidManifest.xml`; follow the existing examples.
-
-### What Gradle does with `roc build`
-
-The phone runs your app as a native library, so Gradle builds each app with:
+Download `android.roc`, the tool for creating, building and running an app,
+and create one:
 
 ```sh
-roc build --target=arm64musl --output=libcounter.so examples/counter/main.roc
+curl -LO https://github.com/lukewilliamboswell/roc-native-android/releases/download/0.0.1/android.roc
+roc android.roc init counter
+cd counter
+roc android.roc run
 ```
 
-It then packages the result with the platform's small Kotlin shell into an
-APK. A plain `roc build main.roc` builds for the computer you are on. That
-gives a desktop library the platform uses for its own tests, not something a
-phone can load.
+`init` writes a counter app, `main.roc`, whose header names the platform
+release, and a copy of `android.roc`. `run` builds the app, installs it on
+the running emulator or connected phone, and starts it. Edit `main.roc` and
+run it again.
+
+| Command | What it does |
+|---|---|
+| `roc android.roc init [DIR]` | create an app in `DIR`, or in this directory |
+| `roc android.roc build` | build `<name>.apk`, signed with the Android debug key |
+| `roc android.roc run` | build, install and start the app |
+
+`build` and `run` take `--id ID` (the application id, by default
+`com.example.<name>`) and `--label TEXT` (the name under the launcher icon,
+by default `<name>`), where `<name>` is the app's directory.
+
+### What `android.roc` does
+
+A phone runs your app as a native library, so the tool builds it with:
+
+```sh
+roc build --target=arm64musl --output=.android/lib/arm64-v8a/libapp.so main.roc
+```
+
+It then makes an APK from the library, a manifest written for your app, and
+the platform's small Kotlin shell (`classes.dex`, which each release carries
+in the tool). The SDK's `aapt2`, `zipalign` and `apksigner` do the
+packaging; no Gradle project is involved. The tool finds the SDK through
+`ANDROID_HOME` or where Android Studio puts it, and uses Android Studio's
+JDK when `JAVA_HOME` is not set.
+
+A plain `roc build main.roc` builds for the computer you are on, which is not
+something a phone can load.
 
 ## Writing an app
 
@@ -87,6 +99,8 @@ Apps use these modules from the platform:
   without changes to the engine. An app's activity supplies its services by
   overriding `RocActivity.portServices`; see
   [`DevicePorts.kt`](android/app/src/main/java/dev/roc/android/DevicePorts.kt).
+  An app built by `android.roc` cannot add Kotlin services yet, so ports
+  work only in this repository's Gradle build for now.
 - **`Ui`**: the screens. Each builder becomes one Android view:
 
 | Builder | View |
@@ -107,6 +121,10 @@ Apps use these modules from the platform:
 Sizes are in dp. Any element with a click handler is tappable.
 
 ## Examples
+
+The examples live in this repository and depend on its working tree. To run
+them all, see [CONTRIBUTING.md](CONTRIBUTING.md); to try one as an app, copy
+its `main.roc` over the one `init` wrote and keep `init`'s platform line.
 
 | Example | Shows |
 |---|---|

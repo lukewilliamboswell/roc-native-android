@@ -43,6 +43,7 @@ feature supplying its own facts.
   - `host/host.zig`: the JNI host, with `host/resources.zig` (the file-handle
     heap, copied from roc-signals' host), built by `host/build.zig`.
   - `android/`: the Kotlin host and the app shell.
+  - `cli/`: the `android.roc` tool package app authors use.
 - **No glue file**: the Roc↔host boundary is a handful of functions over
   `List(U8)`, a `Box` and `U32`, so a handwritten `extern struct` covers it.
 
@@ -56,6 +57,7 @@ platform/targets/    host outputs, never committed
 examples/            apps, depending on the working tree
 android/             Gradle project: the Kotlin host and the app shell
 android/desktop/     the desktop smoke test (runs the engine on the JVM)
+cli/                 the android.roc tool package (Bundle.roc is generated per release)
 scripts/             the tasks, as Roc scripts run by roc-stable
 tests/               the engine modules' recorded digests
 ```
@@ -77,10 +79,22 @@ blueprint run smoke            # every example on the desktop JVM
 blueprint run bundle           # the platform bundle, into build/platform/
 blueprint run bundle -- --test # and examples/counter built against it from localhost
 blueprint run apk              # the Android app shell, with every example (needs the Android SDK)
+blueprint run release -- 0.0.2 # a release's assets, into build/release/0.0.2/
 ```
 
-`cd android && ./gradlew installDebug` builds and installs the app on a
-device, as in the README.
+### Running the examples on a device
+
+Every example gets its own launcher icon in one Gradle-built app:
+
+```sh
+cd android
+printf 'roc.exe=%s\nzig.exe=%s\n' "$(which roc)" "$(which zig)" >> local.properties
+./gradlew installDebug                          # or -Proc.examples=counter,todos
+```
+
+Or open `android/` in Android Studio and press **Run**. A new example needs
+`examples/<name>/main.roc`, an activity subclass in `RocActivity.kt` and a
+manifest entry (see "Adding a feature or an example").
 
 The smoke test loads each example's macOS `.dylib`, which is the same Roc app
 and Zig host as the Android `.so`, and drives it through the same
@@ -175,6 +189,29 @@ emulator. If the emulator refuses to start for lack of disk space, run
 - **Faults:** a Roc crash ends the process through JNI `FatalError`, and the
   message goes to logcat.
 
+## Releasing
+
+`blueprint run release -- VERSION` writes a release's three assets into
+`build/release/VERSION/`:
+
+- the platform bundle, `<hash>.tar.zst`;
+- the `android.roc` tool package, `<hash>.tar.zst`. It is `cli/` with a
+  generated `Bundle.roc` naming the version, the platform's URL and the
+  `roc` it was tested with. It embeds the counter as the `init` scaffold and
+  the Kotlin shell's `classes.dex`, which comes from the Gradle release build
+  (`-Proc.examples=`, shrunk by R8, every `dev.roc.android` class kept);
+- `android.roc`, the launcher an author downloads.
+
+Before publishing, test the exact flow an author follows against a loopback
+copy: run `release -- VERSION --base-url http://localhost:8787`, then serve
+that directory with `python3 -m http.server 8787 --bind ::`. In an empty
+directory, with an empty `XDG_CACHE_HOME`, download `android.roc`, then run
+`init` and `run` on an emulator. Then build again without `--base-url`.
+Publish the three files with
+`gh release create VERSION build/release/VERSION/*`, and repeat the test
+against GitHub. The platform bundle's name is its content hash, so it is the
+same in both builds.
+
 ## What the platform bundle redistributes
 
 `roc bundle` packs exactly the files it is given. `scripts/bundle.roc` stages
@@ -211,10 +248,11 @@ These come from the
 [roc-automation](https://github.com/lukewilliamboswell/roc-automation)
 guidance for platforms:
 
-- **Releases:** a `release.yml` that bundles once, writes the examples
-  archive, generates SBOM sidecars and publishes through
-  `actions/publish-release`, plus a `nightly.yml` on the shared compatibility
-  runner. There is no release to build yet.
+- **Releases from CI:** releases are built with `blueprint run release` and
+  published by hand. Still to come: a `release.yml` that builds once, tests
+  those bytes, generates SBOM sidecars and publishes through
+  `actions/publish-release`, and a `nightly.yml` on the shared compatibility
+  runner.
 - **Recorded example output:** the smoke test's scripted cases live in
   Kotlin (`android/desktop/`), not as recorded expected output under
   `tests/`, so `release-package test-examples` cannot run them.
@@ -226,5 +264,5 @@ guidance for platforms:
 - **Settings:** make `CI` the required status check, protect tags, set the
   default token to read-only and enable private vulnerability reporting.
   Then run roc-automation's `check-settings`.
-- **A starter project for app authors:** the Kotlin shell as a library or
-  template, so an app need not live in this repository.
+- **Ports in tool-built apps:** `android.roc` packages one generic
+  activity, so an app cannot yet supply Kotlin port services.

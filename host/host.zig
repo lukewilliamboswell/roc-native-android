@@ -389,7 +389,17 @@ export fn Java_dev_roc_android_RocEngine_nativeDbg(env: JNIEnv, _: jobject) call
 // ---------------------------------------------------------------------------
 // Without libc, Zig's std asks `getauxval` for the page size (arm64 Android
 // runs 4 KiB and 16 KiB pages). A library has no start code to record the
-// aux vector, so read it from /proc/self/auxv once, by raw syscalls.
+// aux vector, so read it from /proc/self/auxv once, by raw syscalls. An app
+// that is not debuggable runs non-dumpable, and then /proc/self/auxv is
+// root's and cannot be read; for that case the Kotlin host passes the page
+// size (`Os.sysconf(_SC_PAGESIZE)`) before its first call into Roc.
+
+const AT_PAGESZ = 6;
+var page_size_from_host: usize = 0;
+
+export fn Java_dev_roc_android_RocEngine_nativePageSize(_: JNIEnv, _: jobject, size: jint) callconv(.c) void {
+    page_size_from_host = @intCast(size);
+}
 
 var auxv: [64][2]usize = undefined;
 var auxv_len: usize = 0;
@@ -418,6 +428,7 @@ export fn getauxval(kind: usize) callconv(.c) usize {
         if (entry[0] == kind) return entry[1];
         if (entry[0] == 0) break;
     }
+    if (kind == AT_PAGESZ) return page_size_from_host;
     return 0;
 }
 

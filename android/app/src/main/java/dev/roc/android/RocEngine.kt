@@ -6,6 +6,11 @@ package dev.roc.android
  * process (see AndroidManifest.xml). Load the library before first use.
  */
 object RocEngine {
+    /**
+     * The system's page size, which the host needs before its first
+     * allocation when it cannot read /proc/self/auxv (a non-debuggable app).
+     */
+    @JvmStatic external fun nativePageSize(size: Int)
     @JvmStatic external fun nativeVersion(): Int
     /** The program's declaration sections (see `Declarations`). */
     @JvmStatic external fun nativeKeys(): ByteArray

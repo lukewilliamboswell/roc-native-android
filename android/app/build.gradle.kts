@@ -38,8 +38,11 @@ val rocHost = tasks.register<Exec>("rocHost") {
     commandLine(zigExe, "build", "--prefix", File(platformDir, "targets").path, "--cache-dir", File(repo, "build/zig-cache").path)
 }
 
+// `-Proc.examples=counter,todos` builds only those; `-Proc.examples=` none
+// (the release's shell dex needs no app).
+val chosen = providers.gradleProperty("roc.examples").orNull?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 val examples = File(repo, "examples").listFiles { f -> File(f, "main.roc").isFile }
-    .orEmpty().map { it.name }.sorted()
+    .orEmpty().map { it.name }.filter { chosen == null || it in chosen }.sorted()
 
 val rocApps = examples.map { name ->
     tasks.register<Exec>("roc_$name") {
@@ -65,6 +68,14 @@ android {
         versionName = "0.1"
         // Roc apps are built for arm64 only.
         ndk { abiFilters += "arm64-v8a" }
+    }
+    buildTypes {
+        // Only for the shell's classes.dex (scripts/release.roc): shrunk,
+        // and never signed or installed as it is.
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

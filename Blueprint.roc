@@ -6,6 +6,7 @@
 #     blueprint run smoke                  # every example on the desktop JVM, through JNI
 #     blueprint run bundle                 # the platform bundle, in build/platform/<hash>.tar.zst
 #     blueprint run bundle -- --test       # and the counter example built and run against it
+#     blueprint run release -- 0.0.1       # the release's assets, in build/release/0.0.1/
 #     blueprint run apk                    # the Android app shell, every example packaged
 #     blueprint tasks                      # list every task
 #     blueprint update                     # refresh Blueprint.lock
@@ -77,6 +78,10 @@ config = [
 	# `-- --output-dir DIR`, `-- --prebuilt` (skip the host build) and
 	# `-- --test` (serve it on localhost and build examples/counter against it).
 	Task("bundle", [Use("dev"), Run(["scripts/bundle.roc", "--"])]),
+	# Every asset of a release into build/release/<version>/: the platform
+	# bundle, the android.roc tool package and its launcher.
+	# `-- VERSION [--base-url URL]`; needs the Android SDK for the shell.
+	Task("release", [Use("dev"), Run(["scripts/release.roc", "--"])]),
 	Task("apk", [Use("android"), Run(["android/gradlew", "-p", "android", "assembleDebug"])]),
 	# The tooling compiler, as a log records it.
 	Task("tooling-version", [Use("dev"), Run(["roc-stable", "version"])]),
