@@ -1,0 +1,106 @@
+name: CI
+
+# The pull-request gate is `blueprint run check`, the same task a contributor
+# runs. It builds the Zig host and every example for both targets, so it runs
+# on Apple silicon macOS: `arm64mac` is run there (the desktop smoke test
+# drives every example through JNI on the JVM), and `arm64musl`, the Android
+# library, is cross-compiled and audited for what it links, but not run.
+# `APK` packages every example into the Android app shell with Gradle.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The latest Roc nightly, resolved once so every job of a run uses the same
+  # `roc` (roc-automation's model: the package compiler floats; only the
+  # scripts' `roc-stable` is pinned, in Blueprint.roc).
+  nightly:
+    name: Resolve the Roc nightly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.nightly.outputs.tag }}
+    steps:
+      - id: nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(gh api repos/roc-lang/nightlies/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
+
+  check:
+    name: Check
+    needs: nightly
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@6c796f299012707d2e9bad23fd6449ed93f1f475
+        with:
+          cache: 'true'
+          cache-workload: dev
+      - uses: roc-lang/setup-roc@dd81390553b0a1236aedb61cdd4c0ed7cf7eaec4
+        with:
+          version: nightly
+          nightly-tag: ${{ needs.nightly.outputs.tag }}
+      - name: Report the compilers
+        run: |
+          roc version
+          blueprint run tooling-version
+          java -version
+      - run: blueprint check
+      - run: blueprint run check
+
+  apk:
+    name: APK
+    needs: nightly
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@6c796f299012707d2e9bad23fd6449ed93f1f475
+        with:
+          cache: 'true'
+          cache-workload: android
+      - uses: roc-lang/setup-roc@dd81390553b0a1236aedb61cdd4c0ed7cf7eaec4
+        with:
+          version: nightly
+          nightly-tag: ${{ needs.nightly.outputs.tag }}
+      # The runner image's Android SDK (ANDROID_HOME) and JDK 21.
+      - name: Use JDK 21
+        run: echo "JAVA_HOME=$JAVA_HOME_21_arm64" >> "$GITHUB_ENV"
+      - run: blueprint run apk
+
+  # The required status check.
+  ci:
+    name: CI
+    if: always()
+    needs: [check, apk]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every job
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            [ "$result" = success ] || { echo "a required job finished with $result"; exit 1; }
+          done

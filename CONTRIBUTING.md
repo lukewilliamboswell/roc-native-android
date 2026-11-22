@@ -33,13 +33,15 @@ feature supplying its own facts.
   `SignalCore`, `TableCore`, `View`, `Seq`, `Layout`, `EntryRoutes`,
   `ReadyIndex`, `Url`, `Spelling`, `MarkupAdvice`, `Web`, and for ports
   `Port`, `PortJson`, `PortJsonBody`, `PortRegistry`, `Wire` and
-  `WorkerCodec` (which brings the `cbor` package). Never edit these here. `Web` and the `parser` package are present only because the engine
+  `WorkerCodec` (which brings the `cbor` package). Never edit these here:
+  `tests/engine-modules.sha256` records their digests, and `check` compares
+  them. `Web` and the `parser` package are present only because the engine
   imports them.
 - **This project's**:
   - `platform/main.roc`: the platform root.
   - `platform/Ui.roc`: the native vocabulary.
   - `host/host.zig`: the JNI host, with `host/resources.zig` (the file-handle
-    heap, copied from roc-signals' host).
+    heap, copied from roc-signals' host), built by `host/build.zig`.
   - `android/`: the Kotlin host and the app shell.
 - **No glue file**: the Roc↔host boundary is a handful of functions over
   `List(U8)`, a `Box` and `U32`, so a handwritten `extern struct` covers it.
@@ -47,33 +49,52 @@ feature supplying its own facts.
 ## Layout
 
 ```
-host/host.zig        the JNI host (Zig), built into each target's libhost.a
+Blueprint.roc        the development environment and its tasks (Blueprint.lock pins it)
+host/                the JNI host (Zig); `zig build` makes each target's libhost.a
 platform/main.roc    the platform root, Ui.roc and the verbatim engine
-platform/targets/    host outputs, built by build-host.sh, never committed
+platform/targets/    host outputs, never committed
 examples/            apps, depending on the working tree
 android/             Gradle project: the Kotlin host and the app shell
 android/desktop/     the desktop smoke test (runs the engine on the JVM)
+scripts/             the tasks, as Roc scripts run by roc-stable
+tests/               the engine modules' recorded digests
 ```
 
 ## Build and test
 
+The environment is [roc-blueprint](https://github.com/lukewilliamboswell/roc-blueprint)
+0.13.0 on Apple silicon macOS. It fetches `roc-stable` (which runs the
+scripts), Zig and the Kotlin compiler at the digests `Blueprint.lock`
+records. It expects a current Roc nightly (or 0.1.0 RC1) as `roc`, and Java,
+Python 3 and Xcode's command-line tools from the machine.
+
 ```sh
-export ROC=~/roc-macos_apple_silicon-0.1.0_RC1/roc ZIG=zig
-./build.sh            # host, then every example as .dylib (and .so in build/android)
-./smoke.sh            # desktop JVM: the real engine through JNI, scripted interactions
-./bundle.sh           # the platform bundle, into build/bundle/
-cd android && ./gradlew installDebug   # roc-builds every example, packages the APK
+blueprint run check            # the pull-request gate, as CI runs it
+blueprint run check -- smoke   # one stage (pins engine fmt scripts build test smoke android bundle)
+blueprint run build            # host, then every example (build/lib<e>.dylib, build/android/lib<e>.so)
+blueprint run build -- counter # host and one example
+blueprint run smoke            # every example on the desktop JVM
+blueprint run bundle           # the platform bundle, into build/platform/
+blueprint run bundle -- --test # and examples/counter built against it from localhost
+blueprint run apk              # the Android app shell, with every example (needs the Android SDK)
 ```
 
-`smoke.sh` needs `kotlinc`. It loads each example's macOS `.dylib`, which is
-the same Roc app and Zig host as the Android `.so`, and drives it through the
-same `Tree`/`Host` code the app uses. Features whose Android parts can't run
-on the desktop keep their protocol logic in plain Kotlin, so the smoke test
-can exercise it with fakes.
+`cd android && ./gradlew installDebug` builds and installs the app on a
+device, as in the README.
 
-On a device, check what the smoke test can't: views, gestures, the keyboard
-and rotation. The examples have been run on the API 37 arm64 emulator. If
-the emulator refuses to start for lack of disk space, run
+The smoke test loads each example's macOS `.dylib`, which is the same Roc app
+and Zig host as the Android `.so`, and drives it through the same
+`Tree`/`Host` code the app uses. It compiles every app Kotlin file without an
+`import android` line, with `android/desktop/`. Features whose Android parts
+can't run on the desktop keep their protocol logic in plain Kotlin, so the
+smoke test can exercise it with fakes.
+
+The `android` stage audits each `.so`. It must need no other library, leave
+no symbol undefined and have no TLS segment, and it must export every
+`external fun` the Kotlin side declares. CI cannot run an Android device, so
+on a device or emulator check what neither stage can: views, gestures, the
+keyboard and rotation. The examples have been run on the API 37 arm64
+emulator. If the emulator refuses to start for lack of disk space, run
 `emulator -avd <name> -partition-size 4096`.
 
 ### Adding a feature or an example
@@ -156,9 +177,9 @@ the emulator refuses to start for lack of disk space, run
 
 ## What the platform bundle redistributes
 
-`roc bundle` finds the `.roc` modules itself. It only checks that the target
-inputs exist, so `bundle.sh` names them, and the license files, explicitly.
-The bundle holds:
+`roc bundle` packs exactly the files it is given. `scripts/bundle.roc` stages
+the tracked platform modules, each target's `libhost.a` and the root's
+license files, and names every one of them. The bundle holds:
 
 - the platform's `.roc` source;
 - `targets/arm64musl/libhost.a` and `targets/arm64mac/libhost.a`: one
@@ -166,16 +187,15 @@ The bundle holds:
   runtime routines a freestanding `.so` needs, so no runtime library ships;
 - `LICENSE` (UPL-1.0) and `THIRD_PARTY_LICENSES.md`.
 
-The archives are assembled from objects with fixed member names, so their
+`host/build.zig` archives one object, `host.o`, by name, so the archives'
 bytes carry no build-machine paths. There are no external linker inputs, and
 so nothing like `.tbd` stubs:
 
 - **Android:** the linked `.so` has no undefined symbols, no `NEEDED`
   entries and no TLS. It uses no NDK library and no JNI header: JNI is
   reached through the `JNIEnv` function table the VM hands it, and Android
-  APIs are called from Kotlin. Check with
-  `llvm-readelf -lW --dyn-syms -d lib<app>.so | grep -E 'TLS|NEEDED| UND [a-z_]'`,
-  which should print nothing.
+  APIs are called from Kotlin. The `android` stage of `check` checks
+  this for every example and for the bundle's consumer test.
 - **macOS:** the host uses only libSystem, which Roc's own stub resolves.
 
 If the host ever calls an NDK library directly (`liblog`, `libandroid`), the
@@ -187,12 +207,24 @@ bundle.
 
 ## Not yet done
 
-These items come from the roc-automation guidance for platforms:
+These come from the
+[roc-automation](https://github.com/lukewilliamboswell/roc-automation)
+guidance for platforms:
 
-- A `Blueprint.roc` pinning the toolchain, with the scripts turned into tasks.
-- A CI job that builds the host, keyed on a fingerprint of its inputs.
-- SBOM sidecars for the bundle.
-- Example apps built from the bundle served on a loopback address, not from
-  the working tree.
-- A starter project for app authors: the Kotlin shell as a library or
+- **Releases:** a `release.yml` that bundles once, writes the examples
+  archive, generates SBOM sidecars and publishes through
+  `actions/publish-release`, plus a `nightly.yml` on the shared compatibility
+  runner. There is no release to build yet.
+- **Recorded example output:** the smoke test's scripted cases live in
+  Kotlin (`android/desktop/`), not as recorded expected output under
+  `tests/`, so `release-package test-examples` cannot run them.
+- **A fingerprinted host job:** a CI job that builds `libhost.a` once,
+  keyed on a fingerprint of `host/`, Zig's version and the build options.
+  The host builds in seconds, so `check` builds it every time.
+- **An Android runner:** `arm64musl` is cross-compiled and audited in CI but
+  only run by hand on an emulator.
+- **Settings:** make `CI` the required status check, protect tags, set the
+  default token to read-only and enable private vulnerability reporting.
+  Then run roc-automation's `check-settings`.
+- **A starter project for app authors:** the Kotlin shell as a library or
   template, so an app need not live in this repository.

@@ -2,8 +2,8 @@
 // Zig JNI host as the Android .so) into a plain JVM and drives it through
 // the same Tree/Host code the Android app uses, with a manual clock.
 //
-//   see ../../smoke.sh
-//   java -Djava.library.path=. -jar smoke.jar build/libcounter.dylib counter
+//   blueprint run smoke  (scripts/check_all.roc builds build/smoke.jar)
+//   java -jar build/smoke.jar build/libcounter.dylib counter
 
 import dev.roc.android.*
 import java.io.File

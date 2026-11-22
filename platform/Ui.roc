@@ -101,7 +101,7 @@ Ui := [].{
 		h = row_height.max(1).to_u64()
 		count = height.to_u64() // h + 2
 		first = top.to_u64() // h
-		last_start = if total > count total - count else 0
+		last_start = if (total > count) total - count else 0
 		{ start: first.min(last_start), count }
 	}
 
@@ -123,7 +123,7 @@ Ui := [].{
 
 	## Highlight a row, column or card while `on` is true.
 	selected : Signal(ctx, Bool) -> Attr(ctx)
-	selected = |on| Engine.attr_presence("selected", on.map(|is| if is Present("") else Absent))
+	selected = |on| Engine.attr_presence("selected", on.map(|is| if (is) Present("") else Absent))
 
 	# ---- text --------------------------------------------------------------
 
@@ -266,6 +266,7 @@ Ui := [].{
 	## default.
 	link : Str, Str, HandlerOf(ctx, Click) -> Elem(ctx)
 	link = |link_text, url, h| Engine.element("ui-link", [Engine.attr("href", url), Engine.on_click(h)], [Engine.text(link_text)])
+
 	## A labelled on/off switch whose state follows `on`; `h` gets the new state.
 	switch : Str, Signal(ctx, Bool), HandlerOf(ctx, Bool) -> Elem(ctx)
 	switch = |label_text, on, h| Engine.element("input", [Engine.attr("type", "checkbox"), Engine.attr("variant", "switch"), Engine.attr("label", label_text), Engine.prop_s(Engine.Prop.checked, on), Engine.on_checked(h)], [])
@@ -293,8 +294,8 @@ Ui := [].{
 	file_picker_with : { label : Str, types : Str, multiple : Bool }, FilesHandler(ctx) -> Elem(ctx)
 	file_picker_with = |{ label: label_text, types, multiple }, h| {
 		base = [Engine.attr("type", "file"), Engine.attr("label", label_text), Engine.on_files(Change, h)]
-		with_types = if types == "" base else base.append(Engine.attr("accept", types))
-		Engine.element("input", if multiple with_types.append(Engine.attr("multiple", "")) else with_types, [])
+		with_types = if (types == "") base else base.append(Engine.attr("accept", types))
+		Engine.element("input", if (multiple) with_types.append(Engine.attr("multiple", "")) else with_types, [])
 	}
 }
 

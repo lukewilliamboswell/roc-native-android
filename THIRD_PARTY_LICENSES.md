@@ -16,6 +16,10 @@ Not contained, and not redistributed by this bundle:
   JNI header: it calls the JNI function table by its index, as the JNI
   specification defines it. On Android the `.so` an app links needs no other
   library at all.
+- The development tools `Blueprint.roc` fetches to build and test the
+  platform (`roc-stable`, Zig, the Kotlin compiler, and the `basic-cli` and
+  `http` packages the scripts use), and the Kotlin app shell under
+  `android/`.
 - Anything from Apple's SDKs. `targets/arm64mac/libhost.a` refers to the
   libSystem functions `mmap`, `munmap`, `bzero`, `memcpy`, `memset` and
   `__error`, which Roc's own libSystem stub resolves when an app is linked.

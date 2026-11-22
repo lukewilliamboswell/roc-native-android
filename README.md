@@ -21,16 +21,14 @@ main = Engine.program_startup({}, Engine.entries({ fallback: Some("/") }, [{ pat
 
 view : State(In(Root, I64), I64) -> Elem(In(Root, I64))
 view = |count|
-	Ui.column(
-		[
-			Ui.title("Counter"),
-			Ui.text_s(count.signal().map(|n| "Count: ${n.to_str()}")),
-			Ui.row([
-				Ui.button("-", count.update(|n| n - 1)),
-				Ui.button("+", count.update(|n| n + 1)),
-			]),
-		],
-	)
+	Ui.column([
+		Ui.title("Counter"),
+		Ui.text_s(count.signal().map(|n| "Count: ${n.to_str()}")),
+		Ui.row([
+			Ui.button("-", count.update(|n| n - 1)),
+			Ui.button("+", count.update(|n| n + 1)),
+		]),
+	])
 ```
 
 Tapping "+" changes one text view; nothing else is redrawn.
@@ -135,7 +133,10 @@ Sizes are in dp. Any element with a click handler is tappable.
 - Input: taps, text entry with focus and blur, checkboxes, switches,
   sliders, the keyboard's action key and hardware keys on a focused control.
   No gestures (drag, long press, swipe) yet.
-- arm64 devices and emulators only.
+- arm64 devices and emulators only. CI cross-compiles every example for
+  Android (`arm64musl`) and checks what each library links, and it runs
+  every example on macOS (`arm64mac`) through the same host code. The
+  Android builds themselves are run by hand on an emulator, not in CI.
 - If your app crashes, the process ends and the message is in logcat
   (`adb logcat | grep -i roc`).
 

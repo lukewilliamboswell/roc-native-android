@@ -10,7 +10,7 @@
 ## the typed layer for services the Kotlin host supplies.
 ##
 ## - `roc build --target=arm64musl` gives `libapp.so` for an arm64 Android
-##   device or emulator (`../host/host.zig`, built by `build-host.sh`, freestanding, no libc).
+##   device or emulator (`../host/host.zig`, built by `host/build.zig`, freestanding, no libc).
 ## - `roc build --target=arm64mac` gives a `.dylib` with the same JNI symbols,
 ##   which the desktop smoke test loads into a plain JVM.
 platform ""
@@ -29,8 +29,14 @@ platform ""
 	}
 	targets: {
 		inputs_dir: "targets/",
-		arm64musl: { inputs: ["libhost.a", app], output: Shared },
-		arm64mac: { inputs: ["libhost.a", app], output: Shared },
+		arm64musl: {
+			inputs: ["libhost.a", app],
+			output: Shared,
+		},
+		arm64mac: {
+			inputs: ["libhost.a", app],
+			output: Shared,
+		},
 	}
 
 import Core

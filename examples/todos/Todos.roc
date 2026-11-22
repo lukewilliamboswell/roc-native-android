@@ -82,26 +82,20 @@ Todos := [TodoList].{
 	list = |{}|
 		Engine.state(
 			All,
-			|showing| Ui.column(
-				[
-					Ui.row(
-						[
-							Ui.button("Show all", showing.update(|_| All)),
-							Ui.button("Show open", showing.update(|_| Open)),
-							Ui.button("Show done", showing.update(|_| Done)),
-						],
+			|showing| Ui.column([
+				Ui.row([
+					Ui.button("Show all", showing.update(|_| All)),
+					Ui.button("Show open", showing.update(|_| Open)),
+					Ui.button("Show done", showing.update(|_| Done)),
+				]),
+				Ui.list([
+					Engine.table_view(
+						Todos.cells.todos,
+						{ query: showing.signal(), plan: Todos.plan, window: Engine.const(Engine.every_row) },
+						|key, todo| Todos.row(key, todo),
 					),
-					Ui.list(
-						[
-							Engine.table_view(
-								Todos.cells.todos,
-								{ query: showing.signal(), plan: Todos.plan, window: Engine.const(Engine.every_row) },
-								|key, todo| Todos.row(key, todo),
-							),
-						],
-					),
-				],
-			),
+				]),
+			]),
 		)
 
 	## One row. `todo` is a `State` of this row of the table: the checkbox
@@ -111,21 +105,19 @@ Todos := [TodoList].{
 		where [r.store : () -> Engine.Reach(r, _)]
 	row = |key, todo| {
 		title = todo.signal().map(|held| held.title)
-		Ui.row(
-			[
-				Ui.checkbox(
-					todo.signal().map(|held| held.status == Done),
-					[Ui.describe(title.map(|text| "Done: ${text}"))],
-					todo.set_value(|held, checked| { ..held, status: if (checked) Done else Open }),
-				),
-				Engine.text_s(title),
-				Engine.element(
-					"ui-button",
-					[Ui.describe(title.map(|text| "Remove ${text}")), Engine.on_click(Engine.handle_by(key, |id, _| [Todos.cells.todos.update(|table| table.remove(id))]))],
-					[Engine.text("✕")],
-				),
-			],
-		)
+		Ui.row([
+			Ui.checkbox(
+				todo.signal().map(|held| held.status == Done),
+				[Ui.describe(title.map(|text| "Done: ${text}"))],
+				todo.set_value(|held, checked| { ..held, status: if (checked) Done else Open }),
+			),
+			Engine.text_s(title),
+			Engine.element(
+				"ui-button",
+				[Ui.describe(title.map(|text| "Remove ${text}")), Engine.on_click(Engine.handle_by(key, |id, _| [Todos.cells.todos.update(|table| table.remove(id))]))],
+				[Engine.text("✕")],
+			),
+		])
 	}
 
 	## The page: the field and its button, the list, a note while there is
@@ -135,21 +127,17 @@ Todos := [TodoList].{
 	view = |{}| {
 		todos = Todos.cells.todos.signal()
 		add = Engine.handle_by(Todos.adding({}), |at, _| Todos.added(at))
-		Ui.column(
-			[
-				Ui.title("Todos"),
-				Ui.row(
-					[
-						Ui.text_field({ hint: "What needs doing?", value: Todos.cells.draft.signal(), on_change: Engine.handle(|typed| [Todos.cells.draft.set(typed)]), on_done: add }),
-						Ui.button("Add", Engine.handle_by(Todos.adding({}), |at, _| Todos.added(at))),
-					],
-				),
-				Todos.list({}),
-				Engine.when(todos.map(|table| table.len() == 0), || Ui.text("Nothing to do."), || Engine.text("")),
-				Ui.text_s(todos.map(Todos.remaining)),
-				Engine.watch_changes(todos.map(Todos.encode), |text| [Engine.command(StorageSet("todos", text))], Engine.ignore({})),
-			],
-		)
+		Ui.column([
+			Ui.title("Todos"),
+			Ui.row([
+				Ui.text_field({ hint: "What needs doing?", value: Todos.cells.draft.signal(), on_change: Engine.handle(|typed| [Todos.cells.draft.set(typed)]), on_done: add }),
+				Ui.button("Add", Engine.handle_by(Todos.adding({}), |at, _| Todos.added(at))),
+			]),
+			Todos.list({}),
+			Engine.when(todos.map(|table| table.len() == 0), || Ui.text("Nothing to do."), || Engine.text("")),
+			Ui.text_s(todos.map(Todos.remaining)),
+			Engine.watch_changes(todos.map(Todos.encode), |text| [Engine.command(StorageSet("todos", text))], Engine.ignore({})),
+		])
 	}
 
 	## How many to-dos are still open, as the page says it.

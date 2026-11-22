@@ -54,7 +54,7 @@ about : Picked.Choice -> Str
 about = |choice| match choice {
 	Nothing => "No file chosen yet."
 	Chosen(file) => {
-		kind = if file.mime() == "" "unknown type" else file.mime()
+		kind = if (file.mime() == "") "unknown type" else file.mime()
 		"${file.name()}\n${file.size().to_str()} bytes, ${kind}"
 	}
 }
@@ -96,7 +96,7 @@ preview = |{}| Engine.resource(
 			Nothing => []
 		},
 		resolve: |_, _, res| match res {
-			Ok(text) => if text == "" "(empty file)" else text
+			Ok(text) => if (text == "") "(empty file)" else text
 			Err(e) => "(no preview: ${failure(e)})"
 		},
 	},
@@ -149,26 +149,22 @@ link = |{}| Engine.resource(
 view : Engine.Boot -> Engine.Elem(Engine.StoreRoot(_))
 view = |_boot| {
 	chosen = Picked.cells.chosen.signal()
-	Ui.column(
-		[
-			Ui.title("Files"),
-			Ui.row(
-				[
-					Ui.file_picker("Choose a file", Engine.handle(Picked.chose)),
-					Ui.button("Save a copy", Engine.handle_by(chosen, |choice, _| Picked.save(choice))),
-				],
-			),
-			Ui.text_s(chosen.map(about)),
-			digest({}),
-			link({}),
-			preview({}),
-			Engine.on_post(
-				Picked.cells.saves.signal(),
-				|file| [Engine.command(File.save(file, { name: Named("Copy of ${file.name()}") }))],
-				Engine.ignore({}),
-			),
-		],
-	)
+	Ui.column([
+		Ui.title("Files"),
+		Ui.row([
+			Ui.file_picker("Choose a file", Engine.handle(Picked.chose)),
+			Ui.button("Save a copy", Engine.handle_by(chosen, |choice, _| Picked.save(choice))),
+		]),
+		Ui.text_s(chosen.map(about)),
+		digest({}),
+		link({}),
+		preview({}),
+		Engine.on_post(
+			Picked.cells.saves.signal(),
+			|file| [Engine.command(File.save(file, { name: Named("Copy of ${file.name()}") }))],
+			Engine.ignore({}),
+		),
+	])
 }
 
 main : Engine.Program

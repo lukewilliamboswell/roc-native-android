@@ -12,7 +12,7 @@ plugins {
 //
 // The compiler is `roc.exe` in local.properties, else $ROC, else `roc` on
 // PATH. Building from this repository's source also needs the host archives
-// (../../build-host.sh, which needs Zig: `zig.exe` / $ZIG / `zig`); a
+// (`zig build` in ../../host, with `zig.exe` / $ZIG / `zig`); a
 // published platform bundle carries them instead.
 
 val repo: File = rootDir.parentFile
@@ -31,13 +31,11 @@ val hostArchive = File(platformDir, "targets/arm64musl/libhost.a")
 
 val rocHost = tasks.register<Exec>("rocHost") {
     description = "Builds the Zig JNI host archives (platform/targets/*/libhost.a)."
-    inputs.dir(File(repo, "host"))
-    inputs.file(File(repo, "build-host.sh"))
+    inputs.files(fileTree(File(repo, "host")) { include("*.zig") })
     outputs.file(hostArchive)
     outputs.file(File(platformDir, "targets/arm64mac/libhost.a"))
-    workingDir = repo
-    environment("ZIG", zigExe)
-    commandLine("sh", "build-host.sh")
+    workingDir = File(repo, "host")
+    commandLine(zigExe, "build", "--prefix", File(platformDir, "targets").path, "--cache-dir", File(repo, "build/zig-cache").path)
 }
 
 val examples = File(repo, "examples").listFiles { f -> File(f, "main.roc").isFile }

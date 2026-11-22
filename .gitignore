@@ -1,3 +1,10 @@
 build/
 platform/targets/*/libhost.a
 .claude/
+
+# Blueprint's generated environment and links
+.blueprint/
+
+# `zig build` run by hand in host/
+host/.zig-cache/
+host/zig-out/

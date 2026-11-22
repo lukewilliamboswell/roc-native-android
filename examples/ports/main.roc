@@ -59,7 +59,7 @@ Demo := [].{
 	show_device = |d| "${d.manufacturer} ${d.model}, Android ${d.release} (API ${d.sdk.to_str()})"
 
 	show_battery : Battery -> Str
-	show_battery = |b| "Battery: ${b.percent.to_str()}%${if b.charging ", charging" else ""}"
+	show_battery = |b| "Battery: ${b.percent.to_str()}%${if (b.charging) ", charging" else ""}"
 
 	show_motion : Motion -> Str
 	show_motion = |m| "x ${m.x.to_str()}  y ${m.y.to_str()}  z ${m.z.to_str()}"
@@ -70,66 +70,62 @@ Demo := [].{
 	view : State(In(Root, S), S) -> Elem(In(Root, S))
 	view = |st| {
 		v = st.signal()
-		Ui.column(
-			[
-				Ui.title("Ports"),
-				Ui.text("Kotlin services, typed in Roc"),
-				# A call: one answer per press.
-				Ui.text_s(v.map(|s| s.device)),
-				Ui.button("Read device info", st.update(|s| { ..s, asking: s.asking.post({}) })),
-				Engine.on_post(
-					v.map(|s| s.asking),
-					|_| [Demo.ports.device.ask({})],
+		Ui.column([
+			Ui.title("Ports"),
+			Ui.text("Kotlin services, typed in Roc"),
+			# A call: one answer per press.
+			Ui.text_s(v.map(|s| s.device)),
+			Ui.button("Read device info", st.update(|s| { ..s, asking: s.asking.post({}) })),
+			Engine.on_post(
+				v.map(|s| s.asking),
+				|_| [Demo.ports.device.ask({})],
+				st.on_result(
+					|s, _, res| match res {
+						Ok(d) => { ..s, device: Demo.show_device(d) }
+						Err(e) => { ..s, device: "Device: ${Demo.failed(e)}" }
+					},
+				),
+			),
+			# A command: sent after the turn, nothing comes back.
+			Ui.text_field({ hint: "Toast text", value: v.map(|s| s.draft), on_change: st.set_value(|s, t| { ..s, draft: t }), on_done: st.update(Demo.toasted) }),
+			Ui.button("Show toast", st.update(Demo.toasted)),
+			Ui.text_s(v.map(|s| "Toasts sent: ${s.sent.to_str()}")),
+			Engine.on_post(v.map(|s| s.toasts), |text| [Engine.command(Demo.ports.toast.send({ text: text }))], Engine.ignore({})),
+			# A subscription held for the screen's life.
+			Ui.text_s(v.map(|s| s.battery)),
+			Engine.watch(
+				Engine.const({}),
+				|_| [Demo.ports.battery.ask({})],
+				st.on_result(
+					|s, _, res| match res {
+						Ok(b) => { ..s, battery: Demo.show_battery(b) }
+						Err(e) => { ..s, battery: "Battery: ${Demo.failed(e)}" }
+					},
+				),
+			),
+			# A subscription held while the switch is on: off disposes it,
+			# and the service unregisters its sensor listener.
+			Ui.row([
+				Ui.checkbox(v.map(|s| s.following), [], st.set_value(|s, on| { ..s, following: on, motion: if (on) "Motion: starting" else "Motion: off" })),
+				Ui.text("Follow the accelerometer"),
+			]),
+			Ui.text_s(v.map(|s| s.motion)),
+			Ui.text_s(v.map(|s| "Samples: ${s.samples.to_str()}")),
+			Engine.when(
+				v.map(|s| s.following),
+				|| Engine.watch(
+					Engine.const({ every_ms: 100 }),
+					|arg| [Demo.ports.motion.ask(arg)],
 					st.on_result(
 						|s, _, res| match res {
-							Ok(d) => { ..s, device: Demo.show_device(d) }
-							Err(e) => { ..s, device: "Device: ${Demo.failed(e)}" }
+							Ok(m) => { ..s, motion: Demo.show_motion(m), samples: s.samples + 1 }
+							Err(e) => { ..s, motion: "Motion: ${Demo.failed(e)}", following: Bool.False }
 						},
 					),
 				),
-				# A command: sent after the turn, nothing comes back.
-				Ui.text_field({ hint: "Toast text", value: v.map(|s| s.draft), on_change: st.set_value(|s, t| { ..s, draft: t }), on_done: st.update(Demo.toasted) }),
-				Ui.button("Show toast", st.update(Demo.toasted)),
-				Ui.text_s(v.map(|s| "Toasts sent: ${s.sent.to_str()}")),
-				Engine.on_post(v.map(|s| s.toasts), |text| [Engine.command(Demo.ports.toast.send({ text: text }))], Engine.ignore({})),
-				# A subscription held for the screen's life.
-				Ui.text_s(v.map(|s| s.battery)),
-				Engine.watch(
-					Engine.const({}),
-					|_| [Demo.ports.battery.ask({})],
-					st.on_result(
-						|s, _, res| match res {
-							Ok(b) => { ..s, battery: Demo.show_battery(b) }
-							Err(e) => { ..s, battery: "Battery: ${Demo.failed(e)}" }
-						},
-					),
-				),
-				# A subscription held while the switch is on: off disposes it,
-				# and the service unregisters its sensor listener.
-				Ui.row(
-					[
-						Ui.checkbox(v.map(|s| s.following), [], st.set_value(|s, on| { ..s, following: on, motion: if on "Motion: starting" else "Motion: off" })),
-						Ui.text("Follow the accelerometer"),
-					],
-				),
-				Ui.text_s(v.map(|s| s.motion)),
-				Ui.text_s(v.map(|s| "Samples: ${s.samples.to_str()}")),
-				Engine.when(
-					v.map(|s| s.following),
-					|| Engine.watch(
-						Engine.const({ every_ms: 100 }),
-						|arg| [Demo.ports.motion.ask(arg)],
-						st.on_result(
-							|s, _, res| match res {
-								Ok(m) => { ..s, motion: Demo.show_motion(m), samples: s.samples + 1 }
-								Err(e) => { ..s, motion: "Motion: ${Demo.failed(e)}", following: Bool.False }
-							},
-						),
-					),
-					|| Engine.text(""),
-				),
-			],
-		)
+				|| Engine.text(""),
+			),
+		])
 	}
 
 	program : Engine.Program

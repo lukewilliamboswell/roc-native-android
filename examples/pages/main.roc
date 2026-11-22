@@ -82,40 +82,36 @@ view : State(Ctx, Model) -> Elem(Ctx)
 view = |model| {
 	url = model.signal().map(|m| m.url)
 	link = |label, to| Ui.link(label, to, model.set_value(follow))
-	Ui.column(
-		[
-			## Navigation: push what a link posts, hear back, title the page.
-			Engine.on_post(model.signal().map(|m| m.nav), |to| [Engine.command(Push(to))], Engine.ignore({})),
-			Engine.watch(
-				Engine.const({}),
-				|_| [Engine.popstate({})],
-				model.on_result(
-					|m, _, res| match res {
-						Ok(to) => { ..m, url: to }
-						Err(_) => m
-					},
-				),
-			),
-			Engine.watch(url.map(title_of), |t| [Engine.command(Title(t))], Engine.ignore({})),
-			Ui.row([link("Home", "/"), link("About", "/about"), link("Items", "/items")]),
-			Ui.text_s(url.map(|u| "At ${u}")),
-			Engine.switch(
-				url.map(page_of),
-				all_pages,
-				|page| match page {
-					Home => Ui.column([Ui.title("Home"), Ui.text("A multi-page app. Follow a link, then press back.")])
-					About => Ui.column([Ui.title("About"), Ui.text("Each page is a history entry; back pops it."), link("See the items", "/items")])
-					Items => Ui.column([Ui.title("Items"), Ui.list(["1", "2", "3"].map(|id| link("Item ${id}", "/items/${id}")))])
-					Item => Ui.column(
-						[
-							Ui.title("Item"),
-							Ui.text_s(url.map(|u| "Item ${item_of(u)}")),
-							link("All items", "/items"),
-						],
-					)
-					NotFound => Ui.column([Ui.title("Not found"), Ui.text_s(url.map(|u| "Nothing at ${u}"))])
+	Ui.column([
+		## Navigation: push what a link posts, hear back, title the page.
+		Engine.on_post(model.signal().map(|m| m.nav), |to| [Engine.command(Push(to))], Engine.ignore({})),
+		Engine.watch(
+			Engine.const({}),
+			|_| [Engine.popstate({})],
+			model.on_result(
+				|m, _, res| match res {
+					Ok(to) => { ..m, url: to }
+					Err(_) => m
 				},
 			),
-		],
-	)
+		),
+		Engine.watch(url.map(title_of), |t| [Engine.command(Title(t))], Engine.ignore({})),
+		Ui.row([link("Home", "/"), link("About", "/about"), link("Items", "/items")]),
+		Ui.text_s(url.map(|u| "At ${u}")),
+		Engine.switch(
+			url.map(page_of),
+			all_pages,
+			|page| match page {
+				Home => Ui.column([Ui.title("Home"), Ui.text("A multi-page app. Follow a link, then press back.")])
+				About => Ui.column([Ui.title("About"), Ui.text("Each page is a history entry; back pops it."), link("See the items", "/items")])
+				Items => Ui.column([Ui.title("Items"), Ui.list(["1", "2", "3"].map(|id| link("Item ${id}", "/items/${id}")))])
+				Item => Ui.column([
+					Ui.title("Item"),
+					Ui.text_s(url.map(|u| "Item ${item_of(u)}")),
+					link("All items", "/items"),
+				])
+				NotFound => Ui.column([Ui.title("Not found"), Ui.text_s(url.map(|u| "Nothing at ${u}"))])
+			},
+		),
+	])
 }

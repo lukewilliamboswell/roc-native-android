@@ -11,17 +11,13 @@ main = Engine.program_startup({}, Engine.entries({ fallback: Some("/") }, [{ pat
 
 view : State(Ctx, I64) -> Elem(Ctx)
 view = |count|
-	Ui.column(
-		[
-			Ui.title("Counter"),
-			Ui.text_s(count.signal().map(|n| "Count: ${n.to_str()}")),
-			Ui.row(
-				[
-					Ui.button("-", count.update(|n| n - 1)),
-					Ui.button("+", count.update(|n| n + 1)),
-					Ui.button("Reset", count.update(|_| 0)),
-				],
-			),
-			Engine.when(count.signal().map(|n| n < 0), || Ui.warning("Below zero!"), || Engine.text("")),
-		],
-	)
+	Ui.column([
+		Ui.title("Counter"),
+		Ui.text_s(count.signal().map(|n| "Count: ${n.to_str()}")),
+		Ui.row([
+			Ui.button("-", count.update(|n| n - 1)),
+			Ui.button("+", count.update(|n| n + 1)),
+			Ui.button("Reset", count.update(|_| 0)),
+		]),
+		Engine.when(count.signal().map(|n| n < 0), || Ui.warning("Below zero!"), || Engine.text("")),
+	])

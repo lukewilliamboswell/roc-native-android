@@ -1,0 +1,37 @@
+(
+	(fetched ((
+		(name "roc-stable")
+		(obtained Both)
+		(served ("release-assets.githubusercontent.com"))
+		(sha256 "cad09543f51266a0f3d0cb5822d0884e62360defa5bb2d793a137f0d69bf92a8")
+		(size 77216295)
+		(system "aarch64-darwin")
+		(urls ("https://github.com/roc-lang/nightlies/releases/download/nightly-2026-11-14-a87808d/roc_nightly-macos_apple_silicon-2026-11-14-a87808d.tar.gz"))
+		(witness "https://api.github.com/repos/roc-lang/nightlies/releases/tags/nightly-2026-11-14-a87808d")) (
+		(name "zig")
+		(obtained Computed)
+		(served ("ziglang.org"))
+		(sha256 "75f1bc7a1e9852f17ec9a0c1895f767c4ec56d46bc8a834920eece1d0359dd8d")
+		(size 54001240)
+		(system "aarch64-darwin")
+		(urls ("https://ziglang.org/download/0.17.1/zig-aarch64-macos-0.17.1.tar.xz"))
+		(witness "")) (
+		(name "kotlinc")
+		(obtained Both)
+		(served ("release-assets.githubusercontent.com"))
+		(sha256 "7cc140e76daf416a0424a5557f99afd7ca89ebd463ea1101261e3e01c33e75cd")
+		(size 89733618)
+		(system "aarch64-darwin")
+		(urls ("https://github.com/JetBrains/kotlin/releases/download/v2.4.21/kotlin-compiler-2.4.21.zip"))
+		(witness "https://api.github.com/repos/JetBrains/kotlin/releases/tags/v2.4.21"))))
+	(format (
+		(major 2)
+		(minor 0)))
+	(hints ())
+	(intent (
+		(build_sources ())
+		(inputs ())
+		(overlays ())
+		(resolvers ())
+		(sources ())))
+	(sources ()))

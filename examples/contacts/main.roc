@@ -56,7 +56,7 @@ Contacts := [Book].{
 	pad4 : U64 -> Str
 	pad4 = |n| {
 		text = n.to_str()
-		if n < 10 "000${text}" else if n < 100 "00${text}" else if n < 1000 "0${text}" else text
+		if (n < 10) "000${text}" else if (n < 100) "00${text}" else if (n < 1000) "0${text}" else text
 	}
 
 	## The contact under `key`. Keys run in surname-then-given-name order,
@@ -103,18 +103,18 @@ Contacts := [Book].{
 	plan = |n| Engine.sort_by({ keep: |_, c| Contacts.keeps(c, n), sort: |key, _| key })
 
 	matching : Table(U64, Contact), Str -> U64
-	matching = |table, n| table.fold(0, |found, _, c| if Contacts.keeps(c, n) found + 1 else found)
+	matching = |table, n| table.fold(0, |found, _, c| if (Contacts.keeps(c, n)) found + 1 else found)
 
 	## Where `key` stands among the matches: the matches before it.
 	place : Table(U64, Contact), Str, U64 -> U64
-	place = |table, n, key| table.fold(0, |found, k, c| if k < key and Contacts.keeps(c, n) found + 1 else found)
+	place = |table, n, key| table.fold(0, |found, k, c| if (k < key and Contacts.keeps(c, n)) found + 1 else found)
 
 	## The next match after (`Down`) or before (`Up`) `from`.
 	step : Table(U64, Contact), Str, [None, Some(U64)], [Up, Down] -> [None, Some(U64)]
 	step = |table, n, from, direction| {
 		var $at = match (from, direction) {
 			(Some(k), Down) => k + 1
-			(Some(k), Up) => if k == 0 Contacts.count else k - 1
+			(Some(k), Up) => if (k == 0) Contacts.count else k - 1
 			(None, Down) => 0
 			(None, Up) => Contacts.count - 1
 		}
@@ -128,7 +128,7 @@ Contacts := [Book].{
 			}
 			$at = match direction {
 				Down => $at + 1
-				Up => if $at == 0 Contacts.count else $at - 1
+				Up => if ($at == 0) Contacts.count else $at - 1
 			}
 		}
 		match $found {
@@ -171,7 +171,7 @@ Contacts := [Book].{
 			]
 		} else {
 			n = Contacts.needle(r.query)
-			direction = if key.heard == Engine.Chord.plain("ArrowUp") Up else Down
+			direction = if (key.heard == Engine.Chord.plain("ArrowUp")) Up else Down
 			next = Contacts.step(r.table, n, r.selected, direction)
 			match next {
 				None => []
@@ -198,30 +198,28 @@ Contacts := [Book].{
 		where [ctx.store : () -> Engine.Reach(ctx, _)]
 	search_bar = |{}| {
 		searching = Contacts.cells.searching.signal()
-		Ui.row(
-			[
-				Ui.text_field_with(
-					[
-						Ui.fill({}),
-						Engine.ref("search"),
-						Ui.action(Search),
-						Ui.on_focus(Engine.does([Contacts.cells.searching.set(Bool.True)])),
-						Ui.on_blur(Engine.does([Contacts.cells.searching.set(Bool.False)])),
-						Ui.on_done(Engine.does(Contacts.post([Blur("search")]))),
-						Engine.on_key(
-							{ keymap: Engine.const(Engine.Keymap.prevent([Engine.Chord.plain("Escape"), Engine.Chord.plain("ArrowDown"), Engine.Chord.plain("ArrowUp")])) },
-							Engine.handle_by(Contacts.reading({}), Contacts.keyed),
-						),
-					],
-					{ hint: "Search 10,000 contacts", kind: Text, value: Contacts.cells.query.signal(), on_change: Engine.handle(Contacts.searched) },
-				),
-				Engine.when(
-					searching,
-					|| Ui.button("Done", Engine.does(Contacts.post([Blur("search")]))),
-					|| Ui.button("Search", Engine.does(Contacts.post([Focus("search")]))),
-				),
-			],
-		)
+		Ui.row([
+			Ui.text_field_with(
+				[
+					Ui.fill({}),
+					Engine.ref("search"),
+					Ui.action(Search),
+					Ui.on_focus(Engine.does([Contacts.cells.searching.set(Bool.True)])),
+					Ui.on_blur(Engine.does([Contacts.cells.searching.set(Bool.False)])),
+					Ui.on_done(Engine.does(Contacts.post([Blur("search")]))),
+					Engine.on_key(
+						{ keymap: Engine.const(Engine.Keymap.prevent([Engine.Chord.plain("Escape"), Engine.Chord.plain("ArrowDown"), Engine.Chord.plain("ArrowUp")])) },
+						Engine.handle_by(Contacts.reading({}), Contacts.keyed),
+					),
+				],
+				{ hint: "Search 10,000 contacts", kind: Text, value: Contacts.cells.query.signal(), on_change: Engine.handle(Contacts.searched) },
+			),
+			Engine.when(
+				searching,
+				|| Ui.button("Done", Engine.does(Contacts.post([Blur("search")]))),
+				|| Ui.button("Search", Engine.does(Contacts.post([Focus("search")]))),
+			),
+		])
 	}
 
 	# ---- the selected contact ------------------------------------------------
@@ -254,34 +252,35 @@ Contacts := [Book].{
 		where [ctx.store : () -> Engine.Reach(ctx, _)]
 	detail = |{}| {
 		s = Contacts.shown({})
-		Ui.card(
-			[
-				Engine.when(
-					s.map(|it| it == Nobody),
-					|| Ui.label([Ui.tone(Muted)], Engine.const("Tap a contact to see it here.")),
-					|| Ui.column(
-						[
-							Ui.label([Ui.size(Large), Ui.bold({})], s.map(|it| Contacts.field(it, |c| "${c.given} ${c.surname}"))),
-							Ui.label([], s.map(|it| Contacts.field(it, |c| c.phone))),
-							Ui.label([Ui.tone(Accent)], s.map(|it| Contacts.field(it, |c| c.email))),
-							Ui.label([Ui.tone(Muted)], s.map(|it| Contacts.field(it, |c| c.city))),
-							Ui.divider({}),
-							Ui.switch(
-								"Favourite",
-								s.map(|it| match it { Shown(_, c) => c.favourite, Nobody => Bool.False }),
-								Engine.handle_by(
-									Contacts.cells.selected.signal(),
-									|selected, on| match selected {
-										Some(key) => [Contacts.cells.contacts.update(|table| table.update(key, |c| { ..c, favourite: on }))]
-										None => []
-									},
-								),
-							),
-						],
+		Ui.card([
+			Engine.when(
+				s.map(|it| it == Nobody),
+				|| Ui.label([Ui.tone(Muted)], Engine.const("Tap a contact to see it here.")),
+				|| Ui.column([
+					Ui.label([Ui.size(Large), Ui.bold({})], s.map(|it| Contacts.field(it, |c| "${c.given} ${c.surname}"))),
+					Ui.label([], s.map(|it| Contacts.field(it, |c| c.phone))),
+					Ui.label([Ui.tone(Accent)], s.map(|it| Contacts.field(it, |c| c.email))),
+					Ui.label([Ui.tone(Muted)], s.map(|it| Contacts.field(it, |c| c.city))),
+					Ui.divider({}),
+					Ui.switch(
+						"Favourite",
+						s.map(
+							|it| match it {
+								Shown(_, c) => c.favourite
+								Nobody => Bool.False
+							},
+						),
+						Engine.handle_by(
+							Contacts.cells.selected.signal(),
+							|selected, on| match selected {
+								Some(key) => [Contacts.cells.contacts.update(|table| table.update(key, |c| { ..c, favourite: on }))]
+								None => []
+							},
+						),
 					),
-				),
-			],
-		)
+				]),
+			),
+		])
 	}
 
 	# ---- the list ------------------------------------------------------------
@@ -305,7 +304,7 @@ Contacts := [Book].{
 						Ui.label([Ui.size(Small), Ui.tone(Muted)], c.map(|x| "${x.phone} · ${x.city}")),
 					],
 				),
-				Ui.label([Ui.tone(Accent), Ui.size(Large)], c.map(|x| if x.favourite "★" else "")),
+				Ui.label([Ui.tone(Accent), Ui.size(Large)], c.map(|x| if (x.favourite) "★" else "")),
 			],
 		)
 	}
@@ -326,7 +325,7 @@ Contacts := [Book].{
 					[
 						Ui.label(
 							[Ui.size(Small), Ui.tone(Muted)],
-							total.map2(window, |t, w| if t == 0 "No contacts match." else "${t.to_str()} contacts · drawing ${(w.start + 1).to_str()}–${(w.start + w.count).min(t).to_str()}"),
+							total.map2(window, |t, w| if (t == 0) "No contacts match." else "${t.to_str()} contacts · drawing ${(w.start + 1).to_str()}–${(w.start + w.count).min(t).to_str()}"),
 						),
 						Ui.scroll(
 							[
@@ -349,15 +348,13 @@ Contacts := [Book].{
 
 	view : {} -> Elem(Engine.StoreRoot(_))
 	view = |{}|
-		Ui.column(
-			[
-				Ui.title("Contacts"),
-				Contacts.search_bar({}),
-				Contacts.detail({}),
-				Contacts.list({}),
-				Engine.on_post(Contacts.cells.commands.signal(), |commands| commands.map(Engine.command), Engine.ignore({})),
-			],
-		)
+		Ui.column([
+			Ui.title("Contacts"),
+			Contacts.search_bar({}),
+			Contacts.detail({}),
+			Contacts.list({}),
+			Engine.on_post(Contacts.cells.commands.signal(), |commands| commands.map(Engine.command), Engine.ignore({})),
+		])
 
 	program : Engine.Program
 	program = Engine.program_store({}, Contacts.start, |_boot| Contacts.view({}))

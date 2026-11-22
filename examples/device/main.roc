@@ -42,11 +42,11 @@ Device := [Device].{
 	summary : Engine.Boot -> Str
 	summary = |boot| {
 		dark = Engine.boot_media(boot, Device.dark_query) ?? Bool.False
-		"Sampled ${if boot.online "online" else "offline"}, ${if dark "dark" else "light"}, ${boot.languages.first() ?? "?"}, ${Device.zone_name(boot.zone)}, saved clock ${Engine.boot_storage(boot, "clock") ?? "unset"}"
+		"Sampled ${if (boot.online) "online" else "offline"}, ${if (dark) "dark" else "light"}, ${boot.languages.first() ?? "?"}, ${Device.zone_name(boot.zone)}, saved clock ${Engine.boot_storage(boot, "clock") ?? "unset"}"
 	}
 
 	zone_name : Engine.Zone -> Str
-	zone_name = |zone| if zone.name().is_empty() "unknown zone" else zone.name()
+	zone_name = |zone| if (zone.name().is_empty()) "unknown zone" else zone.name()
 
 	program : Engine.Program
 	program = Engine.program_store({ storage_keys: ["clock"], media: [Device.dark_query, Device.calm_query] }, Device.start, view)
@@ -54,7 +54,7 @@ Device := [Device].{
 
 ## Two digits.
 pad : I64 -> Str
-pad = |n| if n < 10 "0${n.to_str()}" else n.to_str()
+pad = |n| if (n < 10) "0${n.to_str()}" else n.to_str()
 
 ## The wall-clock time at `at_ms` in `zone`, which says nothing outside the
 ## span boot measured rather than guess an offset.
@@ -70,8 +70,8 @@ local_time = |zone, at_ms, hours24|
 			if hours24 {
 				"${pad(hour)}${rest}"
 			} else {
-				twelve = if hour % 12 == 0 12 else hour % 12
-				"${twelve.to_str()}${rest} ${if hour < 12 "AM" else "PM"}"
+				twelve = if (hour % 12 == 0) 12 else hour % 12
+				"${twelve.to_str()}${rest} ${if (hour < 12) "AM" else "PM"}"
 			}
 		}
 	}
@@ -94,55 +94,53 @@ view : Engine.Boot -> Engine.Elem(Engine.StoreRoot(_))
 view = |boot| {
 	cells = Device.cells
 	hours24 = cells.hours24.signal()
-	Ui.column(
-		[
-			Ui.title("Device"),
-			Ui.text_s(cells.online.signal().map(|on| if on "Online" else "Offline")),
-			Ui.text_s(cells.dark.signal().map(|on| "Dark mode: ${if on "on" else "off"}")),
-			Ui.text_s(cells.calm.signal().map(|on| "Reduced motion: ${if on "on" else "off"}")),
-			Ui.text("Languages: ${Str.join_with(boot.languages, ", ")}"),
-			Ui.text("Time zone: ${Device.zone_name(boot.zone)}"),
-			Ui.text_s({ at: cells.clock.signal(), h24: hours24 }.Signal.map(|{ at, h24 }| "Local time: ${local_time(boot.zone, at, h24)}")),
-			Ui.button_s(hours24.map(|on| if on "Use 12-hour clock" else "Use 24-hour clock"), Engine.handle_by(hours24, |on, _| [cells.hours24.set(!on)])),
-			Ui.text_s(cells.returns.signal().map(|n| "Returned to the foreground ${n.to_str()} times")),
-			Ui.button("Sample environment", Engine.handle(|_| [cells.samples.update(|outbox| outbox.post({}))])),
-			Ui.text_s(cells.sampled.signal()),
-			follow(Engine.online_changes({}), cells.online),
-			follow(Engine.media_changes(Device.dark_query), cells.dark),
-			follow(Engine.media_changes(Device.calm_query), cells.calm),
-			Engine.watch(
-				Engine.const({}),
-				|_| [Engine.visibility_changes({})],
-				Engine.react(
-					|_, result| match result {
-						Ok(Bool.True) => [cells.returns.update(|n| n + 1)]
-						_ => []
-					},
-				),
+	Ui.column([
+		Ui.title("Device"),
+		Ui.text_s(cells.online.signal().map(|on| if (on) "Online" else "Offline")),
+		Ui.text_s(cells.dark.signal().map(|on| "Dark mode: ${if (on) "on" else "off"}")),
+		Ui.text_s(cells.calm.signal().map(|on| "Reduced motion: ${if (on) "on" else "off"}")),
+		Ui.text("Languages: ${Str.join_with(boot.languages, ", ")}"),
+		Ui.text("Time zone: ${Device.zone_name(boot.zone)}"),
+		Ui.text_s({ at: cells.clock.signal(), h24: hours24 }.Signal.map(|{ at, h24 }| "Local time: ${local_time(boot.zone, at, h24)}")),
+		Ui.button_s(hours24.map(|on| if (on) "Use 12-hour clock" else "Use 24-hour clock"), Engine.handle_by(hours24, |on, _| [cells.hours24.set(!on)])),
+		Ui.text_s(cells.returns.signal().map(|n| "Returned to the foreground ${n.to_str()} times")),
+		Ui.button("Sample environment", Engine.handle(|_| [cells.samples.update(|outbox| outbox.post({}))])),
+		Ui.text_s(cells.sampled.signal()),
+		follow(Engine.online_changes({}), cells.online),
+		follow(Engine.media_changes(Device.dark_query), cells.dark),
+		follow(Engine.media_changes(Device.calm_query), cells.calm),
+		Engine.watch(
+			Engine.const({}),
+			|_| [Engine.visibility_changes({})],
+			Engine.react(
+				|_, result| match result {
+					Ok(Bool.True) => [cells.returns.update(|n| n + 1)]
+					_ => []
+				},
 			),
-			Engine.watch(
-				Engine.const({}),
-				|_| [Engine.interval(1000)],
-				Engine.react(
-					|_, result| match result {
-						Ok(at_ms) => [cells.clock.set(at_ms)]
-						_ => []
-					},
-				),
+		),
+		Engine.watch(
+			Engine.const({}),
+			|_| [Engine.interval(1000)],
+			Engine.react(
+				|_, result| match result {
+					Ok(at_ms) => [cells.clock.set(at_ms)]
+					_ => []
+				},
 			),
-			Engine.watch_changes(hours24.map(|on| if on "24" else "12"), |text| [Engine.command(StorageSet("clock", text))], Engine.ignore({})),
-			Engine.on_post(
-				cells.samples.signal(),
-				|_| [Engine.environment({})],
-				Engine.react(
-					|_, result| match result {
-						Ok(sample) => [cells.sampled.set(Device.summary(sample)), cells.online.set(sample.online)]
-						_ => []
-					},
-				),
+		),
+		Engine.watch_changes(hours24.map(|on| if (on) "24" else "12"), |text| [Engine.command(StorageSet("clock", text))], Engine.ignore({})),
+		Engine.on_post(
+			cells.samples.signal(),
+			|_| [Engine.environment({})],
+			Engine.react(
+				|_, result| match result {
+					Ok(sample) => [cells.sampled.set(Device.summary(sample)), cells.online.set(sample.online)]
+					_ => []
+				},
 			),
-		],
-	)
+		),
+	])
 }
 
 main : Engine.Program
