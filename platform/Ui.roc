@@ -11,6 +11,7 @@ import Engine exposing [Attr, Click, Elem, Handler, HandlerOf, Signal]
 ## | `button`, `button_s` | `ui-button` | `Button` |
 ## | `text_field` | `input` | `EditText` |
 ## | `checkbox` | `input type=checkbox` | `CheckBox` |
+## | `link` | `ui-link href=…` | link-styled `TextView` |
 ##
 ## The engine's controlled value and checked properties belong to `input`,
 ## so the two controls keep that element name; nothing else is HTML.
@@ -69,4 +70,12 @@ Ui := [].{
 	## A checkbox whose state follows `checked`; `h` gets the new state.
 	checkbox : Signal(ctx, Bool), List(Attr(ctx)), HandlerOf(ctx, Bool) -> Elem(ctx)
 	checkbox = |checked, attrs, h| Engine.element("input", [Engine.attr("type", "checkbox"), Engine.prop_s(Engine.Prop.checked, checked), Engine.on_checked(h)].concat(attrs), [])
+
+	## A link to `url` (`ui-link`, link-styled text). A tap sends `h` the
+	## click with the link's facts, `link: Link({ href: url, .. })`, as the
+	## browser does for an `a`; navigating is the app's decision: push the URL
+	## (`Engine.command(Push(url))`) and show its page. Nothing happens by
+	## default.
+	link : Str, Str, HandlerOf(ctx, Click) -> Elem(ctx)
+	link = |label, url, h| Engine.element("ui-link", [Engine.attr("href", url), Engine.on_click(h)], [Engine.text(label)])
 }

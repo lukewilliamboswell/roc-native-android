@@ -11,6 +11,7 @@ import android.util.Log
  * one here to enable it.
  */
 fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
+    runtime.navigation,
 )
 
 /**
@@ -20,7 +21,7 @@ fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
  * is dropped only when its activity finishes (each example runs in its own
  * process, so one runtime per process).
  */
-class RocRuntime private constructor(app: Context) {
+class RocRuntime private constructor(app: Context, launchUrl: String = "/") {
     private val main = Handler(Looper.getMainLooper())
 
     /** The activity currently showing the engine's views, if any. */
@@ -38,7 +39,13 @@ class RocRuntime private constructor(app: Context) {
         override fun focus(node: Node) {}
     }
 
+    /** The history and system back (NavigationFeature.kt); declared before `host`, which reads it. */
+    val navigation = NavigationFeature(launchUrl)
+
     val host = Host(platform, androidFeatures(app, this))
+
+    /** System back: false when the history is at its first entry (let the activity go back). */
+    fun back(): Boolean = navigation.back(host)
 
     companion object {
         private var current: RocRuntime? = null
@@ -47,11 +54,22 @@ class RocRuntime private constructor(app: Context) {
         fun obtain(activity: Activity, library: String): RocRuntime {
             current?.let { return it }
             System.loadLibrary(library)
-            val runtime = RocRuntime(activity.applicationContext)
+            val runtime = RocRuntime(activity.applicationContext, launchUrl(activity))
             current = runtime
             runtime.activity = activity
             runtime.host.start()
             return runtime
+        }
+
+        /**
+         * The first history entry: the launching intent's data URI as
+         * `path?query#fragment` (a deep link, e.g. `am start -d
+         * roc://pages/about`), else `/`.
+         */
+        private fun launchUrl(activity: Activity): String {
+            val data = activity.intent?.data ?: return "/"
+            val path = data.encodedPath?.takeIf { it.startsWith("/") } ?: "/"
+            return path + (data.encodedQuery?.let { "?$it" } ?: "") + (data.encodedFragment?.let { "#$it" } ?: "")
         }
 
         /** Drop the engine; the next `obtain` mounts afresh. */

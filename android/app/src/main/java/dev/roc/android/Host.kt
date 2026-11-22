@@ -92,7 +92,7 @@ class Host(private val platform: Platform, private val features: List<Feature> =
     fun dispatch(target: Node, type: String, value: String = ""): Boolean {
         val (node, handler) = tree.route(target, type) ?: return false
         val bytes = when (handler.kind) {
-            10 -> CLICK // CLICK: modifier flags, not a link
+            10 -> clickPayload(target, tree.root) // CLICK: modifier flags and the nearest link (NavigationFeature.kt)
             5 -> byteArrayOf(if (value == "true") 1 else 0) // OPEN_STATE: checked
             1 -> value.toByteArray(Charsets.UTF_8) // TEXT
             else -> return false // pointer, key, scroll, files: not in this host yet

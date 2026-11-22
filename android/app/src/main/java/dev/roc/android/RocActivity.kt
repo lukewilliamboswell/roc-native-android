@@ -1,7 +1,10 @@
 package dev.roc.android
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import android.view.WindowInsets
 import android.widget.ScrollView
 
@@ -32,10 +35,13 @@ abstract class RocActivity : Activity() {
             insets
         }
         setContentView(scroll)
+        installBack()
     }
 
     override fun onDestroy() {
+        back?.disarm()
         if (runtime.activity === this) {
+            runtime.navigation.changed = null
             runtime.host.renderer = null
             runtime.activity = null
         }
@@ -43,8 +49,44 @@ abstract class RocActivity : Activity() {
         if (isFinishing) RocRuntime.finish()
         super.onDestroy()
     }
+
+    // ---- System back (NavigationFeature.kt) -----------------------------
+    // Back pops the app's history (delivering popstate) while it has more
+    // than one entry; at the first entry the system goes back as usual. On
+    // API 33+ an OnBackInvokedCallback is registered only while there is
+    // history to pop, so the system's own back (and its predictive
+    // animation) applies at the root; below 33, onBackPressed.
+
+    private var back: BackCallback? = null
+
+    private fun installBack() {
+        if (Build.VERSION.SDK_INT >= 33) back = BackCallback(this) { runtime.back() }
+        val sync = { back?.arm(runtime.navigation.history.depth > 1); Unit }
+        runtime.navigation.changed = sync
+        sync()
+    }
+
+    @Deprecated("Below API 33, and on 33+ when the dispatcher path is not in use")
+    override fun onBackPressed() {
+        if (!runtime.back()) super.onBackPressed()
+    }
+
+    /** API 33+ only: holds the dispatcher callback, registered while armed. */
+    private class BackCallback(private val activity: Activity, onBack: () -> Unit) {
+        private val callback = OnBackInvokedCallback { onBack() }
+        private var armed = false
+        fun arm(on: Boolean) {
+            if (on == armed) return
+            val dispatcher = activity.onBackInvokedDispatcher
+            if (on) dispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
+            else dispatcher.unregisterOnBackInvokedCallback(callback)
+            armed = on
+        }
+        fun disarm() = arm(false)
+    }
 }
 
 class CounterActivity : RocActivity() { override val library = "counter" }
 class TodosActivity : RocActivity() { override val library = "todos" }
 class StopwatchActivity : RocActivity() { override val library = "stopwatch" }
+class PagesActivity : RocActivity() { override val library = "pages" }

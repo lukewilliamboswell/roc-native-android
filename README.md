@@ -47,6 +47,7 @@ Android widgets (no WebView).
 | `examples/counter` | local state, signals into text, `Engine.when` |
 | `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
 | `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| `examples/pages` | entry routes, `Ui.link`s that push history entries, a page with a parameter, system back through a popstate subscription |
 
 Each example is its own launcher icon, with its own process and task, because a
 library holds one engine and every app exports the same JNI names.
@@ -110,8 +111,19 @@ emulator refuses to start for lack of disk space, run
 - The host implements only what the examples need: element, text, template
   and row commands, LISTEN, PROP value/checked, timers and intervals,
   startup ack and opportunity. Other effects (HTTP, storage, workers, ports)
-  stop with "unsupported effect kind". NAV and STORAGE writes are ignored.
+  stop with "unsupported effect kind". STORAGE writes are ignored.
 - Events: click, input, change (checkbox), and `done` (keyboard action).
+- Navigation (`NavigationFeature.kt`): NAV push/replace move a history
+  stack kept in the runtime (so it survives rotation, not process death);
+  system back pops it and delivers the new URL to popstate subscribers, and
+  at the first entry the system goes back as usual. URLs resolve against the
+  current entry (dot segments, `?`, `#`) without percent-encoding; a URL with
+  a scheme or authority is ignored. No forward. Boot section 1 is the first
+  entry: `/`, or the launching intent's data path (a deep link, `am start
+  -d`); a deterministic program picks its entry from it, so a path outside
+  the catalogue opens the fallback. A `Ui.link` is a `ui-link` with an
+  `href`: a click on it carries the link facts, and following it is the
+  app's decision (there is no default action).
 - A Roc crash ends the process through JNI `FatalError` (the message goes to
   logcat). Boot bytes are empty: fallback entry, no storage or environment.
 - arm64 only.
