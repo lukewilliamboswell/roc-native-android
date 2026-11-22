@@ -93,14 +93,19 @@ Apps use these modules from the platform:
 
 | Builder | View |
 |---|---|
-| `Ui.column`, `Ui.list` | a vertical layout (`list` adds dividers) |
-| `Ui.row` | a horizontal layout; plain text in it takes the spare width |
-| `Ui.title`, `Ui.text`, `Ui.text_s`, `Ui.warning` | text |
+| `Ui.column`, `Ui.row`, `Ui.card` (and `_with` forms taking attributes) | vertical and horizontal layouts, and a rounded card |
+| `Ui.list` | a vertical layout with dividers |
+| `Ui.scroll` | a scrolling area; it reports its scroll position and size, so long lists can draw only what is on screen |
+| `Ui.rows`, `Ui.window` | a window of fixed-height rows from a long list (see the contacts example) |
+| `Ui.spacer`, `Ui.divider` | spare space and a hairline |
+| `Ui.title`, `Ui.text`, `Ui.text_s`, `Ui.warning`, `Ui.label` | text; `label` takes a `tone`, `size` and `bold` |
 | `Ui.button`, `Ui.button_s` | a button |
-| `Ui.text_field` | a one-line text field (`on_change`, `on_done`) |
-| `Ui.checkbox` | a checkbox |
-| `Ui.link` | a link: a tap gives your handler the URL, and you decide where to go (push it to history and show that page) |
-| `Ui.describe` | an accessibility description for any element |
+| `Ui.link` | a link: a tap gives your handler the URL, and you decide where to go |
+| `Ui.text_field`, `Ui.text_field_with` | a one-line text field, with focus, blur, the keyboard's action key and key handlers |
+| `Ui.checkbox`, `Ui.switch`, `Ui.slider` | on/off controls and a slider |
+| `Ui.fill`, `Ui.pad`, `Ui.selected`, `Ui.describe` | attributes: take the spare space, padding, a highlight, an accessibility description |
+
+Sizes are in dp. Any element with a click handler is tappable.
 
 ## Examples
 
@@ -111,6 +116,7 @@ Apps use these modules from the platform:
 | [`stopwatch`](examples/stopwatch/main.roc) | a repeating timer that starts and stops with the app's state |
 | [`device`](examples/device/main.roc) | device facts: online, dark mode, languages, a local clock through the time zone, and a saved preference |
 | [`pages`](examples/pages/main.roc) | several pages with links between them, a page with a parameter, and the system back button |
+| [`contacts`](examples/contacts/main.roc) | 10 000 contacts in a scrolling list that draws only what is on screen, a search field, keyboard shortcuts, and a detail card |
 | [`ports`](examples/ports/main.roc) | calling Android from Roc through ports: device info, a Toast, the battery level and the accelerometer |
 | [`http`](examples/http/main.roc) | an HTTPS request: loading, progress, status, network and timeout errors, retry and cancel |
 
@@ -124,8 +130,9 @@ Apps use these modules from the platform:
   (any other query reads false); and ports. Files and workers are not
   supported yet: an app that asks for one stops with "unsupported effect
   kind".
-- Input is limited to taps, text entry, checkboxes and the keyboard's action
-  key.
+- Input: taps, text entry with focus and blur, checkboxes, switches,
+  sliders, the keyboard's action key and hardware keys on a focused control.
+  No gestures (drag, long press, swipe) yet.
 - arm64 devices and emulators only.
 - If your app crashes, the process ends and the message is in logcat
   (`adb logcat | grep -i roc`).

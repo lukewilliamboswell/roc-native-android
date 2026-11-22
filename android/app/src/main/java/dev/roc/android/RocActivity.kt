@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import android.view.WindowInsets
-import android.widget.ScrollView
 
 /**
  * Shows one Roc app: attaches views to the process's mounted engine
@@ -33,17 +32,17 @@ abstract class RocActivity : Activity() {
         runtime.uiMode.set(resources.configuration.uiMode)
         val host = runtime.host
         val renderer = ViewRenderer(this) { host }
-        val scroll = ScrollView(this).apply { addView(renderer.rootView(host.tree)) }
+        val screen = renderer.screen(host.tree)
         host.renderer = renderer
         // Android 15+ draws apps edge to edge: keep content clear of the
         // status and navigation bars and the keyboard. (No action bar: the
         // app draws its own title with Ui.title.)
-        scroll.setOnApplyWindowInsetsListener { v, insets ->
+        screen.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
-        setContentView(scroll)
+        setContentView(screen)
         installBack()
     }
 
@@ -109,3 +108,4 @@ class PortsActivity : RocActivity() {
     override val library = "ports"
     override fun portServices(app: Context) = devicePorts(app)
 }
+class ContactsActivity : RocActivity() { override val library = "contacts" }

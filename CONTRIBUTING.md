@@ -130,8 +130,15 @@ the emulator refuses to start for lack of disk space, run
   follow `HttpURLConnection` (never across http/https). The response body
   has no bound beyond memory. A method `HttpURLConnection` refuses answers
   `Network`. File bodies (FX 12, 15) belong to the files feature.
-- **Events:** click, input, change (checkbox) and `done` (the keyboard's
-  action key).
+- **Events:** click (with link facts), input, change (checkbox, switch,
+  slider), `done` (the keyboard's action key), focus and blur, keys (KIND_KEY
+  through keymaps, PROP 4/5) on a focused view, and scroll and size reports
+  (KIND_SCROLL, KIND_SIZE) from `ui-scroll`, paced per frame through
+  `Host.report` as the browser runtime does. A controlled value is deferred
+  while its field is focused (`Input.kt`'s `TextControl`). An IME only
+  composes in the focused view, so focus stands in for composition, and
+  REF 4 applies at once. REF 1–7 are performed by the renderer. Not yet:
+  document keys, `seen`, pointer events, horizontal scrolling.
 - **Faults:** a Roc crash ends the process through JNI `FatalError`, and the
   message goes to logcat.
 

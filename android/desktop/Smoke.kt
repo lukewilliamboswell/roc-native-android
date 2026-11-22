@@ -65,6 +65,30 @@ class CountingRenderer : Renderer {
     var renders = 0
     var lastDirty = 0
     override fun render(tree: Tree) { renders++; lastDirty = tree.dirty.size }
+
+    // REF commands, with focus kept as a view system keeps it.
+    var host: Host? = null
+    var focused: Element? = null
+    val refs = mutableListOf<Ref>()
+    override fun ref(ref: Ref) {
+        refs += ref
+        val e = ref.node as? Element ?: return
+        when (ref.op) {
+            1, 3, 5 -> focus(e)
+            2 -> if (focused === e) blur()
+        }
+    }
+    fun focus(e: Element) {
+        if (focused === e) return
+        blur()
+        focused = e
+        host?.focused(e)
+    }
+    fun blur() {
+        val e = focused ?: return
+        focused = null
+        host?.blurred(e)
+    }
 }
 
 fun show(n: Node, indent: String = ""): String = when (n) {
@@ -107,6 +131,7 @@ fun main(args: Array<String>) {
     // Port services must match the app's declared ports, so only `ports` gets them.
     val ports = if (args[1] == "ports") listOf(fakes.feature()) else emptyList()
     val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature() + navigation + ports)
+    renderer.host = host
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -146,6 +171,7 @@ fun main(args: Array<String>) {
             host.dispatch(remove, "click")
             expect("removed one row", host.rows().size == 1 && !text().contains("Buy milk"))
         }
+        "contacts" -> contacts(host, platform, renderer) // SmokeContacts.kt
         "stopwatch" -> {
             expect("starts at 0:00.0", text().contains("0:00.0"))
             host.dispatch(host.button("Start"), "click")
