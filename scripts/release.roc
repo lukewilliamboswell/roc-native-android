@@ -63,7 +63,7 @@ main! = |raw_args| {
 	for notice in ["LICENSE", "THIRD_PARTY_LICENSES.md"] {
 		Path.copy!(Path.utf8(notice), Path.utf8("${stage}/${notice}"))?
 	}
-	roc_version = Cmd.new("roc").args([OsStr.from_str("version")]).capture!()?.trim()
+	roc_version = Cmd.new("roc").args([OsStr.from_str("version")]).capture!()?.trim().drop_prefix("Roc compiler version ")
 	Path.write_utf8!(Path.utf8("${stage}/Bundle.roc"), Release.bundle_module({ version, platform_url: "${base_url}/${platform_bundle}", roc_version }))?
 	step!(Cmd.new("roc").args(["test", "main.roc"].map(OsStr.from_str)).cwd(Path.utf8(stage)), "roc test (the tool)")?
 	tool_out = "${root}/build/release/tool"
