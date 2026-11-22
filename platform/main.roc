@@ -19,6 +19,7 @@ platform ""
 	provides {
 		"roc_engine_drop": drop_for_host,
 		"roc_engine_event": event_for_host,
+		"roc_engine_files": files_for_host,
 		"roc_engine_init": init_for_host,
 		"roc_engine_keys": keys_for_host,
 		"roc_engine_version": version_for_host,
@@ -93,6 +94,15 @@ init_for_host = |boot| {
 event_for_host : Handle, List(U8), List(U8), U32, U32, List(U8) -> Step
 event_for_host = |boxed, buf, wbuf, node, handler, payload| {
 	(next, cmds, work) = (Core.driver(main).event)(release(boxed), buf, wbuf, node, handler, payload)
+	{ cmds, state: hold(next), work }
+}
+
+## A files-kind event: the file record and the handles the host minted for its
+## files, which move into the engine with the call (as roc-signals'
+## `files_for_host`). On the effect node it is a result that carries files.
+files_for_host : Handle, List(U8), List(U8), U32, U32, List(U8), List(Box(U64)) -> Step
+files_for_host = |boxed, buf, wbuf, node, handler, record, blobs| {
+	(next, cmds, work) = (Core.driver(main).files)(release(boxed), buf, wbuf, node, handler, record, blobs)
 	{ cmds, state: hold(next), work }
 }
 

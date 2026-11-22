@@ -24,7 +24,7 @@ interface Renderer {
  * The host outlives any one view system: `renderer` can be replaced (an
  * activity recreated on rotation attaches a new one) without remounting.
  */
-class Host(private val platform: Platform, private val features: List<Feature> = emptyList()) {
+class Host(private val platform: Platform, val features: List<Feature> = emptyList()) {
     private val fxOwners = HashMap<Int, Feature>()
     private val opOwners = HashMap<Int, Feature>()
 
@@ -49,7 +49,8 @@ class Host(private val platform: Platform, private val features: List<Feature> =
     var started = false
         private set
 
-    private val queue = ArrayDeque<Triple<Int, Int, ByteArray>>()
+    /** Queued turns, each one call into the engine returning its batch. */
+    private val queue = ArrayDeque<() -> ByteArray>()
     private var busy = false
     private val live = HashMap<Int, () -> Unit>()
     private var opportunity: (() -> Unit)? = null
@@ -109,9 +110,28 @@ class Host(private val platform: Platform, private val features: List<Feature> =
     }
 
     fun send(node: Int, handler: Int, payload: ByteArray) {
-        queue.add(Triple(node, handler, payload))
+        turn { RocEngine.nativeEvent(node, handler, payload) }
+    }
+
+    /**
+     * Queue a turn whose engine call the caller makes (a files-kind event,
+     * which stages handles first): `call` runs when no other batch is being
+     * applied and returns its command batch.
+     */
+    fun turn(call: () -> ByteArray) {
+        queue.add(call)
         drain()
     }
+
+    /** As `answer`, with the caller making the engine call (see `turn`). */
+    fun answerTurn(id: Int, done: Boolean = true, call: () -> ByteArray) {
+        if (!live.containsKey(id)) return
+        if (done) live.remove(id)
+        turn(call)
+    }
+
+    /** The feature of type `T` this host was built with, if any. */
+    inline fun <reified T : Feature> feature(): T? = features.filterIsInstance<T>().firstOrNull()
 
     /** Whether request `id` is still live (not answered for good, not cancelled). */
     fun isLive(id: Int) = live.containsKey(id)
@@ -131,10 +151,7 @@ class Host(private val platform: Platform, private val features: List<Feature> =
         if (busy) return
         busy = true
         try {
-            while (queue.isNotEmpty()) {
-                val (node, handler, payload) = queue.removeFirst()
-                applyBatch(RocEngine.nativeEvent(node, handler, payload))
-            }
+            while (queue.isNotEmpty()) applyBatch(queue.removeFirst()())
         } finally {
             busy = false
         }
@@ -149,8 +166,9 @@ class Host(private val platform: Platform, private val features: List<Feature> =
         val effects = tree.effects.toList()
         val ack = tree.startupAck
         for (e in effects) perform(e)
+        for (f in features) f.applied(this)
         // The cold batch is applied and its effects started: acknowledge it.
-        if (ack) queue.add(Triple(FX_NODE, 0, byteArrayOf(254.toByte())))
+        if (ack) queue.add { RocEngine.nativeEvent(FX_NODE, 0, byteArrayOf(254.toByte())) }
     }
 
     private fun fired(): ByteArray = bytesOf { u8(5); u64(platform.nowMs()) }

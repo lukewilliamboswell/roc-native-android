@@ -1,7 +1,9 @@
 package dev.roc.android
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -11,6 +13,7 @@ import android.util.Log
  * one here to enable it.
  */
 fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
+    FilesFeature(AndroidFiles(app, runtime)),
 )
 
 /**
@@ -39,6 +42,37 @@ class RocRuntime private constructor(app: Context) {
     }
 
     val host = Host(platform, androidFeatures(app, this))
+
+    // ---- activity results (the file chooser and save dialogs) ------------
+    // Kept here, not in an activity, so a result delivered to an activity
+    // recreated while the dialog was open still reaches its caller.
+
+    private val results = HashMap<Int, (Int, Intent?) -> Unit>()
+    private var nextRequest = 1
+
+    /**
+     * Start `intent` from the current activity for a result, which `done`
+     * receives (result code, data) on the main thread. False when there is no
+     * activity or nothing handles the intent.
+     */
+    fun launch(intent: Intent, done: (Int, Intent?) -> Unit): Boolean {
+        val a = activity ?: return false
+        val code = nextRequest
+        nextRequest = nextRequest % 0xffff + 1
+        results[code] = done
+        return try {
+            a.startActivityForResult(intent, code)
+            true
+        } catch (e: ActivityNotFoundException) {
+            results.remove(code)
+            false
+        }
+    }
+
+    /** An activity received a result (`RocActivity.onActivityResult`). */
+    fun activityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        results.remove(requestCode)?.invoke(resultCode, data)
+    }
 
     companion object {
         private var current: RocRuntime? = null

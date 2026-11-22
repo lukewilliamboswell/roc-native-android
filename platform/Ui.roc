@@ -1,4 +1,4 @@
-import Engine exposing [Attr, Click, Elem, Handler, HandlerOf, Signal]
+import Engine exposing [Attr, Click, Elem, FilesHandler, Handler, HandlerOf, Signal]
 
 ## The native vocabulary apps build Android screens from. Each builder is one
 ## engine element that the Kotlin host maps to one View:
@@ -11,6 +11,7 @@ import Engine exposing [Attr, Click, Elem, Handler, HandlerOf, Signal]
 ## | `button`, `button_s` | `ui-button` | `Button` |
 ## | `text_field` | `input` | `EditText` |
 ## | `checkbox` | `input type=checkbox` | `CheckBox` |
+## | `file_picker`, `file_picker_with` | `input type=file` | `Button` opening the system file chooser |
 ##
 ## The engine's controlled value and checked properties belong to `input`,
 ## so the two controls keep that element name; nothing else is HTML.
@@ -69,4 +70,22 @@ Ui := [].{
 	## A checkbox whose state follows `checked`; `h` gets the new state.
 	checkbox : Signal(ctx, Bool), List(Attr(ctx)), HandlerOf(ctx, Bool) -> Elem(ctx)
 	checkbox = |checked, attrs, h| Engine.element("input", [Engine.attr("type", "checkbox"), Engine.prop_s(Engine.Prop.checked, checked), Engine.on_checked(h)].concat(attrs), [])
+
+	## A button labelled `label` that opens the system's file chooser
+	## (`ACTION_OPEN_DOCUMENT`) for one file of any type. `h` receives the
+	## chosen file as a handle (`Engine.Received`, as from a file input's
+	## `change`), never its bytes; a cancelled chooser delivers nothing.
+	file_picker : Str, FilesHandler(ctx) -> Elem(ctx)
+	file_picker = |label, h| Ui.file_picker_with({ label, types: "", multiple: Bool.False }, h)
+
+	## As `file_picker`, offering the media types in `types` first (a comma
+	## separated list such as `"text/*,application/pdf"`, `""` for any) and,
+	## when `multiple` is true, letting the user choose several files. The
+	## types are a hint to the chooser, as `accept` is to a file input.
+	file_picker_with : { label : Str, types : Str, multiple : Bool }, FilesHandler(ctx) -> Elem(ctx)
+	file_picker_with = |{ label, types, multiple }, h| {
+		base = [Engine.attr("type", "file"), Engine.attr("label", label), Engine.on_files(Change, h)]
+		with_types = if types == "" base else base.append(Engine.attr("accept", types))
+		Engine.element("input", if multiple with_types.append(Engine.attr("multiple", "")) else with_types, [])
+	}
 }

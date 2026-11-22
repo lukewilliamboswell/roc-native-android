@@ -36,6 +36,8 @@ Android widgets (no WebView).
   - `host/host.zig`: the JNI host. It is freestanding, with no libc
     and no NDK: the `.so` has no undefined symbols, no `NEEDED` entries and
     no TLS.
+  - `host/resources.zig`: the file-handle heap, copied from roc-signals'
+    host (see [Files](#files)).
   - `android/`: the Kotlin host and app.
 - **No glue file**: the Roc↔host boundary is four functions taking
   `List(U8)`, a `Box` and `U32`, so a handwritten `extern struct` covers it.
@@ -47,6 +49,7 @@ Android widgets (no WebView).
 | `examples/counter` | local state, signals into text, `Engine.when` |
 | `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
 | `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| `examples/files` | a file chosen with the system chooser held as a handle: its name, size and type, a text preview (FX 11), its SHA-256 (FX 13), its URL (FX 14), and a saved copy (SAVE) |
 
 Each example is its own launcher icon, with its own process and task, because a
 library holds one engine and every app exports the same JNI names.
@@ -57,7 +60,7 @@ library holds one engine and every app exports the same JNI names.
 host/host.zig        the JNI host (Zig), built into each target's libhost.a
 platform/main.roc    the platform root, Ui.roc and the verbatim engine
 platform/targets/    host outputs, built by build-host.sh, never committed
-examples/            the three apps, depending on the working tree
+examples/            the apps, depending on the working tree
 android/             the Kotlin host and app shell (not part of the bundle)
 ```
 
@@ -105,6 +108,32 @@ taps and typing, and the stopwatch's interval stops when it is cancelled. If the
 emulator refuses to start for lack of disk space, run
 `emulator -avd <name> -partition-size 4096`.
 
+## Files
+
+Files follow roc-signals' design ("Files"): the app holds a handle, never a
+file's bytes. `Ui.file_picker` is an `input type=file` with a files-kind
+`change` handler (`Engine.on_files`), drawn as a Button that opens
+`ACTION_OPEN_DOCUMENT`. `FilesFeature` keeps each chosen file (its content
+`Uri`) under the token of a `Box(U64)` handle that `host.zig` mints in its
+blob heap (`RocFiles.nativeStage`), then delivers the file record through
+`roc_engine_files` (`RocFiles.nativeEvent`). Roc's reference count decides
+when a handle goes; after every batch whose effects were performed the host
+drains the released tokens (`RocFiles.nativeReleased`) and lets their files
+go. A request holds its file until it is answered.
+
+- FX 11 reads a range as bytes or text, bounded by the request's
+  `max_bytes` and `maxFileBytes` (256 MiB); FX 13 is SHA-256 of a range;
+  SAVE asks where to save with `ACTION_CREATE_DOCUMENT` and writes the range.
+- FX 14 answers the file's `content://` URI as its URL, or for a part of a
+  file a `file://` URI of a cached copy of the range (deleted with the
+  handle). Neither is a web URL: an `ImageView` can show either.
+- FX 12 (upload a range as an HTTP body, answered as kind 1) and FX 15
+  (download a body into a new file handle, tag 21) use a small
+  `HttpURLConnection` client of their own, without progress reports, cache
+  or credentials policies.
+- The plumbing is plain Kotlin over a `FileAccess`: the desktop smoke test
+  serves it with temp files (`android/desktop/FilesSmoke.kt`).
+
 ## Spike limits
 
 - The host implements only what the examples need: element, text, template
@@ -114,6 +143,11 @@ emulator refuses to start for lack of disk space, run
 - Events: click, input, change (checkbox), and `done` (keyboard action).
 - A Roc crash ends the process through JNI `FatalError` (the message goes to
   logcat). Boot bytes are empty: fallback entry, no storage or environment.
+- Files: no drop or paste of files, no persisted Uri permissions (a chosen
+  file is readable for the life of the process), no `File.fetch`/`upload`
+  progress, and the INTERNET permission is not declared, so FX 12 and 15
+  answer `Network` on a device until it is. A chooser or save dialog open
+  when the process dies is forgotten.
 - arm64 only.
 
 ## License

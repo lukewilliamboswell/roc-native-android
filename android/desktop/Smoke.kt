@@ -70,7 +70,7 @@ fun main(args: Array<String>) {
     System.load(File(args[0]).absolutePath)
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
-    val host = Host(platform)
+    val host = Host(platform, filesSmokeFeatures(args[1]))
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -125,6 +125,7 @@ fun main(args: Array<String>) {
             host.dispatch(host.button("Reset"), "click")
             expect("reset", text().contains("0:00.0") && !text().contains("Lap 1"))
         }
+        "files" -> filesSmoke(host, platform) // FilesSmoke.kt
     }
     println("final:\n" + show(host.tree.root))
     host.stop()

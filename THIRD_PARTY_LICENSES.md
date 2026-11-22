@@ -5,7 +5,7 @@ What the roc-native-android platform bundle contains, and the license of each.
 | Bundle path | Contents | License |
 |---|---|---|
 | `*.roc` | Platform source. `Core`, `Engine`, `SignalCore`, `TableCore`, `View`, `Seq`, `Layout`, `EntryRoutes`, `ReadyIndex`, `Url`, `Spelling`, `MarkupAdvice` and `Web` are copied unchanged from roc-signals; `main.roc` and `Ui.roc` are this project's | UPL-1.0 (`LICENSE`) |
-| `targets/arm64mac/libhost.a`, `targets/arm64musl/libhost.a` | `host.o`: this project's `host/host.zig` (including its own `memcpy`/`memset` on Android), compiled with parts of Zig's standard library (its allocator and formatting code) | UPL-1.0 (`LICENSE`); the Zig standard library code is MIT, below |
+| `targets/arm64mac/libhost.a`, `targets/arm64musl/libhost.a` | `host.o`: this project's `host/host.zig` (including its own `memcpy`/`memset` on Android) and `host/resources.zig` (the file-handle heap, copied from roc-signals, UPL-1.0), compiled with parts of Zig's standard library (its allocator and formatting code) | UPL-1.0 (`LICENSE`); the Zig standard library code is MIT, below |
 
 Not contained, and not redistributed by this bundle:
 

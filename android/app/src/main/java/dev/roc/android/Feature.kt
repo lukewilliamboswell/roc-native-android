@@ -30,6 +30,13 @@ interface Feature {
     /** Supply boot facts before mount. */
     fun boot(facts: BootFacts, decl: Declarations) {}
 
+    /**
+     * A batch has been applied and its effects and commands performed (the
+     * point where a request has taken every file it names, so released file
+     * handles can be drained).
+     */
+    fun applied(host: Host) {}
+
     /** The engine has mounted (and acknowledged startup is queued). */
     fun started(host: Host) {}
 

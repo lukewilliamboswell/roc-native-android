@@ -1,6 +1,7 @@
 package dev.roc.android
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowInsets
 import android.widget.ScrollView
@@ -34,6 +35,12 @@ abstract class RocActivity : Activity() {
         setContentView(scroll)
     }
 
+    @Deprecated("Activity results are how the file chooser answers")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        runtime.activityResult(requestCode, resultCode, data)
+    }
+
     override fun onDestroy() {
         if (runtime.activity === this) {
             runtime.host.renderer = null
@@ -48,3 +55,4 @@ abstract class RocActivity : Activity() {
 class CounterActivity : RocActivity() { override val library = "counter" }
 class TodosActivity : RocActivity() { override val library = "todos" }
 class StopwatchActivity : RocActivity() { override val library = "stopwatch" }
+class FilesActivity : RocActivity() { override val library = "files" }
