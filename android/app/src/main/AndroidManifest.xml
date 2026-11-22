@@ -26,6 +26,11 @@
             </intent-filter>
         </activity>
         <activity android:name=".HttpActivity" android:label="Roc HTTP" android:process=":http" android:taskAffinity="dev.roc.android.http" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity android:name=".DeviceActivity" android:label="Roc Device" android:process=":device" android:taskAffinity="dev.roc.android.device" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
