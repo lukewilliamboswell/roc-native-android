@@ -2,7 +2,7 @@
 // Zig JNI host as the Android .so) into a plain JVM and drives it through
 // the same Tree/Host code the Android app uses, with a manual clock.
 //
-//   kotlinc ../app/src/main/java/dev/roc/android/{Tree,Host,RocEngine}.kt Smoke.kt -include-runtime -d smoke.jar
+//   see ../../smoke.sh
 //   java -Djava.library.path=. -jar smoke.jar build/libcounter.dylib counter
 
 import dev.roc.android.*
@@ -70,7 +70,8 @@ fun main(args: Array<String>) {
     System.load(File(args[0]).absolutePath)
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
-    val host = Host(platform, renderer)
+    val host = Host(platform)
+    host.renderer = renderer
     host.start()
     platform.advance(0)
     println("mounted:\n" + show(host.tree.root))

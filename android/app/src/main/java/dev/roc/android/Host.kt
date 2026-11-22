@@ -3,7 +3,7 @@ package dev.roc.android
 /** What the host needs from its environment: time, deferred work, output. */
 interface Platform {
     fun nowMs(): Long
-    /** Run `task` after `ms`; the returned function cancels it. */
+    /** Run `task` after `ms` on the engine's thread; the returned function cancels it. */
     fun schedule(ms: Long, task: () -> Unit): () -> Unit
     fun log(text: String)
     fun title(text: String) {}
@@ -18,10 +18,37 @@ interface Renderer {
 /**
  * The thin driver around the engine: every input (a view event, an effect
  * result, the startup acknowledgement) is one turn, queued so a turn never
- * starts while another batch is being applied.
+ * starts while another batch is being applied. Effects and commands go to
+ * the feature that owns their kind or opcode (see `Feature`).
+ *
+ * The host outlives any one view system: `renderer` can be replaced (an
+ * activity recreated on rotation attaches a new one) without remounting.
  */
-class Host(private val platform: Platform, private val renderer: Renderer) {
-    val tree = Tree()
+class Host(private val platform: Platform, private val features: List<Feature> = emptyList()) {
+    private val fxOwners = HashMap<Int, Feature>()
+    private val opOwners = HashMap<Int, Feature>()
+
+    init {
+        for (f in features) {
+            for (k in f.fxDecoders.keys) check(fxOwners.put(k, f) == null) { "FX kind $k claimed twice" }
+            for (o in f.opDecoders.keys) check(opOwners.put(o, f) == null) { "opcode $o claimed twice" }
+        }
+    }
+
+    val tree = Tree(
+        features.flatMap { it.fxDecoders.entries }.associate { it.key to it.value },
+        features.flatMap { it.opDecoders.entries }.associate { it.key to it.value },
+    )
+
+    /** Where changes are drawn; null while no view system is attached. */
+    var renderer: Renderer? = null
+        set(value) { field = value; value?.render(tree) }
+
+    lateinit var declarations: Declarations
+        private set
+    var started = false
+        private set
+
     private val queue = ArrayDeque<Triple<Int, Int, ByteArray>>()
     private var busy = false
     private val live = HashMap<Int, () -> Unit>()
@@ -29,19 +56,32 @@ class Host(private val platform: Platform, private val renderer: Renderer) {
 
     companion object {
         const val FX_NODE = -1 // 0xffffffff
+        const val PROTOCOL = 23
         val CLICK = byteArrayOf(0, 0) // no modifier keys, not a link
     }
 
+    val now: Long get() = platform.nowMs()
+    fun schedule(ms: Long, task: () -> Unit) = platform.schedule(ms, task)
+    fun log(text: String) = platform.log(text)
+
     fun start() {
-        check(RocEngine.nativeVersion() == 23) { "engine speaks protocol ${RocEngine.nativeVersion()}, host 23" }
-        applyBatch(RocEngine.nativeInit())
+        check(RocEngine.nativeVersion() == PROTOCOL) { "engine speaks protocol ${RocEngine.nativeVersion()}, host $PROTOCOL" }
+        declarations = Declarations(RocEngine.nativeKeys())
+        val facts = BootFacts(declarations)
+        for (f in features) f.boot(facts, declarations)
+        applyBatch(RocEngine.nativeInit(encodeBoot(declarations, facts)))
+        started = true
+        for (f in features) f.started(this)
         drain()
     }
 
     fun stop() {
         live.values.forEach { it() }
         live.clear()
+        opportunity?.invoke()
+        for (f in features) f.stopped(this)
         RocEngine.nativeDrop()
+        started = false
     }
 
     /**
@@ -55,15 +95,36 @@ class Host(private val platform: Platform, private val renderer: Renderer) {
             10 -> CLICK // CLICK: modifier flags, not a link
             5 -> byteArrayOf(if (value == "true") 1 else 0) // OPEN_STATE: checked
             1 -> value.toByteArray(Charsets.UTF_8) // TEXT
-            else -> return false // pointer, key, scroll, files: not in this spike
+            else -> return false // pointer, key, scroll, files: not in this host yet
         }
         send(node, handler.number, bytes)
+        return true
+    }
+
+    /** A view event whose payload the caller has already encoded. */
+    fun dispatchRaw(target: Node, type: String, payload: (Handler) -> ByteArray?): Boolean {
+        val (node, handler) = tree.route(target, type) ?: return false
+        send(node, handler.number, payload(handler) ?: return false)
         return true
     }
 
     fun send(node: Int, handler: Int, payload: ByteArray) {
         queue.add(Triple(node, handler, payload))
         drain()
+    }
+
+    /** Whether request `id` is still live (not answered for good, not cancelled). */
+    fun isLive(id: Int) = live.containsKey(id)
+
+    /**
+     * Answer request `id` with a result payload (Appendix B, "Effect
+     * results"). `done` ends the request; a subscription or progress report
+     * passes false. An answer to a request no longer live is dropped.
+     */
+    fun answer(id: Int, payload: ByteArray, done: Boolean = true) {
+        if (!live.containsKey(id)) return
+        if (done) live.remove(id)
+        send(FX_NODE, id, payload)
     }
 
     private fun drain() {
@@ -84,7 +145,7 @@ class Host(private val platform: Platform, private val renderer: Renderer) {
         if (dbg.isNotEmpty()) platform.log(String(dbg, Charsets.UTF_8).trimEnd())
         tree.clearMarks()
         tree.apply(batch)
-        renderer.render(tree)
+        renderer?.render(tree)
         val effects = tree.effects.toList()
         val ack = tree.startupAck
         for (e in effects) perform(e)
@@ -92,30 +153,33 @@ class Host(private val platform: Platform, private val renderer: Renderer) {
         if (ack) queue.add(Triple(FX_NODE, 0, byteArrayOf(254.toByte())))
     }
 
-    private fun result(id: Int, payload: ByteArray) {
-        if (live.containsKey(id)) send(FX_NODE, id, payload)
-    }
-
-    private fun fired(): ByteArray {
-        val at = platform.nowMs()
-        return ByteArray(9) { i -> if (i == 0) 5 else (at shr (8 * (i - 1))).toByte() }
-    }
+    private fun fired(): ByteArray = bytesOf { u8(5); u64(platform.nowMs()) }
 
     private fun perform(e: Effect) {
         when (e) {
-            is Effect.Timer -> live[e.id] = platform.schedule(e.ms) { val p = fired(); result(e.id, p); live.remove(e.id) }
+            is Effect.Timer -> {
+                live[e.id] = {}
+                val cancel = platform.schedule(e.ms) { answer(e.id, fired()) }
+                live[e.id] = cancel
+            }
             is Effect.Interval -> {
                 fun tick() {
-                    live[e.id] = platform.schedule(e.ms) { tick(); result(e.id, fired()) }
+                    live[e.id] = platform.schedule(e.ms) { tick(); answer(e.id, fired(), done = false) }
                 }
                 tick()
             }
-            is Effect.StorageRead -> live[e.id] = platform.schedule(0) { result(e.id, byteArrayOf(4)); live.remove(e.id) }
+            is Effect.Request -> {
+                // Live before perform, so a synchronous answer is delivered.
+                live[e.id] = {}
+                val cancel = fxOwners.getValue(e.fx.kind).perform(this, e.fx)
+                if (cancel != null && live.containsKey(e.id)) live[e.id] = cancel
+            }
+            is Effect.Command -> opOwners.getValue(e.op).command(this, e.op, e.value)
             is Effect.Cancel -> live.remove(e.id)?.invoke()
             is Effect.Opportunity -> {
                 opportunity?.invoke(); opportunity = null
                 if (e.request) {
-                    val payload = ByteArray(9) { i -> if (i == 0) 255.toByte() else (e.generation shr (8 * (i - 1))).toByte() }
+                    val payload = bytesOf { u8(255); u64(e.generation) }
                     opportunity = platform.schedule(0) { opportunity = null; send(FX_NODE, 0, payload) }
                 }
             }

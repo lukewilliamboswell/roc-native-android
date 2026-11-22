@@ -65,11 +65,14 @@ class Element(val tag: String) : Node() {
     }
 }
 
-/** One effect request (FX) the host is asked to perform. */
+/** Work the host performs after a batch is applied, in stream order. */
 sealed class Effect(val id: Int) {
     class Timer(id: Int, val ms: Long) : Effect(id)
     class Interval(id: Int, val ms: Long) : Effect(id)
-    class StorageRead(id: Int, val key: String) : Effect(id)
+    /** An FX kind owned by a feature. */
+    class Request(val fx: Fx) : Effect(fx.id)
+    /** A command (opcode) owned by a feature. */
+    class Command(val op: Int, val value: Any) : Effect(0)
     class Cancel(id: Int) : Effect(id)
     class Opportunity(val request: Boolean, val generation: Long) : Effect(0)
     class Title(val text: String) : Effect(0)
@@ -80,7 +83,11 @@ class Template(val root: Node, val holes: List<Hole>)
 
 class Hole(val kind: Int, val path: List<Int>, val name: String = "", val handler: Handler? = null, val prop: Int = 0)
 
-class Tree {
+class Tree(
+    /** FX kind decoders and opcode decoders, from the host's features. */
+    private val fxDecoders: Map<Int, (Reader) -> Any> = emptyMap(),
+    private val opDecoders: Map<Int, (Reader) -> Any> = emptyMap(),
+) {
     val root = Element("div")
     private val nodes = HashMap<Int, Node>()
     private val templates = HashMap<Int, Template>()
@@ -136,16 +143,8 @@ class Tree {
 
     // ---- decoding -------------------------------------------------------
 
-    private class R(val b: ByteArray, var at: Int, val end: Int = b.size) {
-        fun u8(): Int = b[at++].toInt() and 0xff
-        fun u32(): Int { var v = 0; for (i in 0 until 4) v = v or (u8() shl (8 * i)); return v }
-        fun u64(): Long { var v = 0L; for (i in 0 until 8) v = v or (u8().toLong() shl (8 * i)); return v }
-        fun str(): String { val n = u32(); val s = String(b, at, n, Charsets.UTF_8); at += n; return s }
-        fun more() = at < end
-    }
-
     /** An expanded name: namespace code (4 = explicit URI), prefix, local. */
-    private fun name(r: R): String {
+    private fun name(r: Reader): String {
         val ns = r.u8()
         if (ns == 4) r.str()
         val prefix = r.str()
@@ -153,7 +152,7 @@ class Tree {
         return if (prefix.isEmpty()) local else "$prefix:$local"
     }
 
-    private fun attribute(r: R, e: Element, name: String) {
+    private fun attribute(r: Reader, e: Element, name: String) {
         when (val present = r.u8()) {
             0 -> e.attrs.remove(name)
             1 -> e.attrs[name] = r.str()
@@ -162,7 +161,7 @@ class Tree {
         touch(e)
     }
 
-    private fun templateNode(r: R): Node = when (val kind = r.u8()) {
+    private fun templateNode(r: Reader): Node = when (val kind = r.u8()) {
         1 -> {
             val e = Element(name(r))
             r.u8() // child container: CHILDREN or TEMPLATE_CONTENT (both children here)
@@ -181,7 +180,7 @@ class Tree {
         return n
     }
 
-    private fun template(r: R, end: Int): Template {
+    private fun template(r: Reader, end: Int): Template {
         val root = templateNode(r)
         val holes = mutableListOf<Hole>()
         repeat(r.u8()) {
@@ -213,24 +212,36 @@ class Tree {
         touch(e)
     }
 
-    private fun fx(r: R) {
+    private fun fx(r: Reader) {
         val id = r.u32()
-        when (val kind = r.u8()) {
-            3 -> effects += Effect.Timer(id, r.u32().toLong() and 0xffffffffL)
-            4 -> effects += Effect.Interval(id, r.u32().toLong() and 0xffffffffL)
-            2, 17 -> effects += Effect.StorageRead(id, r.str())
-            5, 6, 7, 20 -> {} // subscriptions that never fire here
-            16, 18 -> r.str()
-            else -> error("unsupported effect kind $kind in this spike host")
+        val kind = r.u8()
+        val decode = fxDecoders[kind]
+        when {
+            decode != null -> effects += Effect.Request(Fx(id, kind, decode(r)))
+            kind == 3 -> effects += Effect.Timer(id, r.u32().toLong() and 0xffffffffL)
+            kind == 4 -> effects += Effect.Interval(id, r.u32().toLong() and 0xffffffffL)
+            // Subscriptions no feature serves never fire: accepted and idle.
+            kind == 5 || kind == 6 || kind == 7 || kind == 20 -> {}
+            kind == 16 || kind == 18 -> r.str()
+            else -> error("unsupported effect kind $kind: no feature of this host serves it")
         }
+    }
+
+    /** A command a feature owns; false when none does. */
+    private fun command(op: Int, r: Reader): Boolean {
+        val decode = opDecoders[op] ?: return false
+        effects += Effect.Command(op, decode(r))
+        return true
     }
 
     fun apply(batch: ByteArray) {
         if (batch.isEmpty()) return
-        val r = R(batch, 0)
+        val r = Reader(batch)
         r.u8() // flags: 0 plain, 1 view transition (applied plainly here)
         while (r.more()) {
-            when (val op = r.u8()) {
+            val op = r.u8()
+            if (command(op, r)) continue
+            when (op) {
                 1 -> { // INST
                     val id = r.u32(); val parent = r.u32(); val before = r.u32(); val site = r.u32()
                     val tpl = templates[site] ?: error("protocol: no template $site")
@@ -305,8 +316,8 @@ class Tree {
                 12 -> { val n = lookup(r.u32()); (n as TextNode).text = r.str(); touch(n) } // SETTEXT
                 13 -> fx(r)
                 14 -> effects += Effect.Cancel(r.u32())
-                15 -> { r.u8(); r.str() } // NAV: no history on Android in this spike
-                16 -> { val o = r.u8(); r.str(); if (o == 1 || o == 3) r.str() } // STORAGE: not persisted
+                15 -> { r.u8(); r.str() } // NAV, when no feature owns it: ignored
+                16 -> { val o = r.u8(); r.str(); if (o == 1 || o == 3) r.str() } // STORAGE, likewise
                 17 -> effects += Effect.Title(r.str())
                 18 -> { // REF
                     val o = r.u8(); val n = lookup(r.u32())

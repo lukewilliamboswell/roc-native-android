@@ -41,6 +41,7 @@ const Step = extern struct {
 
 extern fn roc_engine_version() callconv(.c) u32;
 extern fn roc_engine_init(boot: RocList) callconv(.c) Step;
+extern fn roc_engine_keys() callconv(.c) RocList;
 extern fn roc_engine_event(state: *anyopaque, buf: RocList, wbuf: RocList, node: u32, handler: u32, payload: RocList) callconv(.c) Step;
 extern fn roc_engine_drop(state: *anyopaque, buf: RocList, wbuf: RocList) callconv(.c) void;
 
@@ -197,12 +198,23 @@ export fn Java_dev_roc_android_RocEngine_nativeVersion(_: JNIEnv, _: jobject) ca
     return @intCast(roc_engine_version());
 }
 
-export fn Java_dev_roc_android_RocEngine_nativeInit(env: JNIEnv, _: jobject) callconv(.c) jbyteArray {
+/// The program's declaration sections, read before mount.
+export fn Java_dev_roc_android_RocEngine_nativeKeys(env: JNIEnv, _: jobject) callconv(.c) jbyteArray {
+    current_env = env;
+    defer current_env = null;
+    dbg_len = 0;
+    const keys = roc_engine_keys();
+    // Called once per process; the list (which may be a static constant or a
+    // slice) is left to Roc rather than freed by hand.
+    return toJava(env, keys.bytes());
+}
+
+export fn Java_dev_roc_android_RocEngine_nativeInit(env: JNIEnv, _: jobject, boot: jbyteArray) callconv(.c) jbyteArray {
     current_env = env;
     defer current_env = null;
     dbg_len = 0;
     if (state != null) fatal("contract: init while an engine is mounted");
-    keep(roc_engine_init(RocList.empty));
+    keep(roc_engine_init(fromJava(env, boot)));
     return toJava(env, cmds.bytes());
 }
 

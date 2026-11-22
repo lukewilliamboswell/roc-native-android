@@ -7,8 +7,10 @@ package dev.roc.android
  */
 object RocEngine {
     @JvmStatic external fun nativeVersion(): Int
-    /** Mount; returns the first command batch. */
-    @JvmStatic external fun nativeInit(): ByteArray
+    /** The program's declaration sections (see `Declarations`). */
+    @JvmStatic external fun nativeKeys(): ByteArray
+    /** Mount with the boot bytes; returns the first command batch. */
+    @JvmStatic external fun nativeInit(boot: ByteArray): ByteArray
     /** One turn; returns its command batch. */
     @JvmStatic external fun nativeEvent(node: Int, handler: Int, payload: ByteArray): ByteArray
     @JvmStatic external fun nativeDrop()

@@ -20,6 +20,7 @@ platform ""
 		"roc_engine_drop": drop_for_host,
 		"roc_engine_event": event_for_host,
 		"roc_engine_init": init_for_host,
+		"roc_engine_keys": keys_for_host,
 		"roc_engine_version": version_for_host,
 	}
 	targets: {
@@ -72,8 +73,15 @@ release = |handle| {
 version_for_host : () -> U32
 version_for_host = || Core.driver(main).version
 
-## Mount. The Android host passes empty boot bytes: an HTML `div` mount root,
-## the fallback entry, no storage and default environment facts.
+## The program's declaration sections (design.md, Appendix B, "Boot"): the
+## storage keys, ports, media queries, time-zone span, session keys and
+## startup catalogue the host reads before it builds the boot bytes. Unlike
+## the browser root, no protocol-facts section 12 is appended: this host
+## decodes protocol 23 itself.
+keys_for_host : () -> List(U8)
+keys_for_host = || (Core.driver(main).keys)()
+
+## Mount with the boot bytes the host built from the declarations.
 init_for_host : List(U8) -> Step
 init_for_host = |boot| {
 	(state, cmds, work) = (Core.driver(main).init)(boot)
