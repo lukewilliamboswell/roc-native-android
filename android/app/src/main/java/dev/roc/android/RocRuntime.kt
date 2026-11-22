@@ -11,6 +11,8 @@ import android.util.Log
  * one here to enable it.
  */
 fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
+    StorageFeature(PreferencesStore(app, runtime.library), processSession),
+    EnvironmentFeature(AndroidEnvironment(app, runtime)),
 )
 
 /**
@@ -20,11 +22,17 @@ fun androidFeatures(app: Context, runtime: RocRuntime): List<Feature> = listOf(
  * is dropped only when its activity finishes (each example runs in its own
  * process, so one runtime per process).
  */
-class RocRuntime private constructor(app: Context) {
+class RocRuntime private constructor(app: Context, val library: String) {
     private val main = Handler(Looper.getMainLooper())
 
     /** The activity currently showing the engine's views, if any. */
     var activity: Activity? = null
+
+    /** Whether the engine's activity is started (onStart to onStop). */
+    val visible = Watchable(true)
+
+    /** The configuration's `uiMode` (night bits), as activities report it. */
+    val uiMode = Watchable(app.resources.configuration.uiMode)
 
     private val platform = object : Platform {
         override fun nowMs() = System.currentTimeMillis()
@@ -47,7 +55,7 @@ class RocRuntime private constructor(app: Context) {
         fun obtain(activity: Activity, library: String): RocRuntime {
             current?.let { return it }
             System.loadLibrary(library)
-            val runtime = RocRuntime(activity.applicationContext)
+            val runtime = RocRuntime(activity.applicationContext, library)
             current = runtime
             runtime.activity = activity
             runtime.host.start()

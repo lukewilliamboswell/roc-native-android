@@ -4,5 +4,5 @@
 set -e
 cd "$(dirname "$0")"
 K=android/app/src/main/java/dev/roc/android
-kotlinc $K/Tree.kt $K/Host.kt $K/RocEngine.kt $K/Wire.kt $K/Boot.kt $K/Feature.kt android/desktop/*.kt -include-runtime -d build/smoke.jar 2>/dev/null
-for e in ${*:-counter todos stopwatch}; do java -jar build/smoke.jar "build/lib$e.dylib" "$e"; done
+kotlinc $K/Tree.kt $K/Host.kt $K/RocEngine.kt $K/Wire.kt $K/Boot.kt $K/Feature.kt $K/StorageFeature.kt $K/EnvironmentFeature.kt android/desktop/*.kt -include-runtime -d build/smoke.jar 2>/dev/null
+for e in ${*:-counter todos stopwatch device}; do java -jar build/smoke.jar "build/lib$e.dylib" "$e"; done

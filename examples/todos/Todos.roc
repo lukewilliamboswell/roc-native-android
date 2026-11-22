@@ -1,5 +1,5 @@
 ## Adapted from roc-signals' www/samples/todos: the same store, decision and
-## query plan, drawn with the native `Ui` vocabulary (persistence removed).
+## query plan and saved list, drawn with the native `Ui` vocabulary.
 import pf.Engine exposing [Elem, Signal, State, Table]
 import pf.Ui
 
@@ -129,7 +129,8 @@ Todos := [TodoList].{
 	}
 
 	## The page: the field and its button, the list, a note while there is
-	## nothing to do, and the count of open to-dos.
+	## nothing to do, the count of open to-dos, and the effect that saves
+	## the list.
 	view : {} -> Elem(Engine.StoreRoot(_))
 	view = |{}| {
 		todos = Todos.cells.todos.signal()
@@ -146,6 +147,7 @@ Todos := [TodoList].{
 				Todos.list({}),
 				Engine.when(todos.map(|table| table.len() == 0), || Ui.text("Nothing to do."), || Engine.text("")),
 				Ui.text_s(todos.map(Todos.remaining)),
+				Engine.watch_changes(todos.map(Todos.encode), |text| [Engine.command(StorageSet("todos", text))], Engine.ignore({})),
 			],
 		)
 	}
@@ -197,7 +199,7 @@ Todos := [TodoList].{
 	}
 
 	program : Engine.Program
-	program = Engine.program_store({}, Todos.start, |_boot| Todos.view({}))
+	program = Engine.program_store({ storage_keys: ["todos"], max_inflight: 32 }, Todos.start, |_boot| Todos.view({}))
 }
 
 ## A new title is added under the next key, and the next key and the draft

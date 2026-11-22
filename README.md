@@ -45,8 +45,9 @@ Android widgets (no WebView).
 | Example | Exercises |
 |---|---|
 | `examples/counter` | local state, signals into text, `Engine.when` |
-| `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes |
+| `examples/todos` | store cells, a keyed table drawn through `table_view` row templates, a filter query, a text field and checkboxes; the list is saved to local storage and restored at boot |
 | `examples/stopwatch` | an interval effect held by a watch site, cancelled when it is disposed |
+| `examples/device` | environment facts: connectivity, visibility and media subscriptions, languages, a clock through the boot time zone, an environment snapshot, and a preference in local storage |
 
 Each example is its own launcher icon, with its own process and task, because a
 library holds one engine and every app exports the same JNI names.
@@ -57,7 +58,7 @@ library holds one engine and every app exports the same JNI names.
 host/host.zig        the JNI host (Zig), built into each target's libhost.a
 platform/main.roc    the platform root, Ui.roc and the verbatim engine
 platform/targets/    host outputs, built by build-host.sh, never committed
-examples/            the three apps, depending on the working tree
+examples/            the apps, depending on the working tree
 android/             the Kotlin host and app shell (not part of the bundle)
 ```
 
@@ -109,11 +110,25 @@ emulator refuses to start for lack of disk space, run
 
 - The host implements only what the examples need: element, text, template
   and row commands, LISTEN, PROP value/checked, timers and intervals,
-  startup ack and opportunity. Other effects (HTTP, storage, workers, ports)
-  stop with "unsupported effect kind". NAV and STORAGE writes are ignored.
+  startup ack and opportunity. Other effects (HTTP, workers, ports)
+  stop with "unsupported effect kind". NAV writes are ignored.
+- Storage (`StorageFeature`): local storage is one SharedPreferences file per
+  app library and survives restarts; session storage is in memory and lives
+  as long as the process. Reads answer one task later. With a single window,
+  `StorageChanges` never reports; a write that throws is reported to
+  `StorageWriteFailures` (always as `Unavailable`; SharedPreferences writes
+  are applied asynchronously, so a disk failure is not seen).
+- Environment (`EnvironmentFeature`): online from ConnectivityManager,
+  visible while the activity is started, languages from LocaleList, a
+  SecureRandom seed, and the zone from java.time's rules (transitions over
+  the declared `zone_days`, at most 128 offsets). Media queries know only
+  `prefers-color-scheme` and `prefers-reduced-motion` (the animator duration
+  scale set to off); any other query is false. A deterministic-startup
+  program boots on neutral facts and samples them with FX 22, as in the
+  browser.
 - Events: click, input, change (checkbox), and `done` (keyboard action).
 - A Roc crash ends the process through JNI `FatalError` (the message goes to
-  logcat). Boot bytes are empty: fallback entry, no storage or environment.
+  logcat). The boot URL is `/` and the entry the fallback.
 - arm64 only.
 
 ## License
