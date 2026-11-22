@@ -19,6 +19,7 @@ abstract class RocActivity : Activity() {
         super.onCreate(savedInstanceState)
         runtime = RocRuntime.obtain(this, library)
         runtime.activity = this
+        runtime.uiMode.set(resources.configuration.uiMode)
         val host = runtime.host
         val renderer = ViewRenderer(this) { host }
         val scroll = ScrollView(this).apply { addView(renderer.rootView(host.tree)) }
@@ -33,6 +34,10 @@ abstract class RocActivity : Activity() {
         }
         setContentView(scroll)
     }
+
+    // Visibility (FX 7): the engine's page is visible while its activity is started.
+    override fun onStart() { super.onStart(); runtime.visible.set(true) }
+    override fun onStop() { runtime.visible.set(false); super.onStop() }
 
     override fun onDestroy() {
         if (runtime.activity === this) {
@@ -49,3 +54,4 @@ class CounterActivity : RocActivity() { override val library = "counter" }
 class TodosActivity : RocActivity() { override val library = "todos" }
 class StopwatchActivity : RocActivity() { override val library = "stopwatch" }
 class HttpActivity : RocActivity() { override val library = "http" }
+class DeviceActivity : RocActivity() { override val library = "device" }

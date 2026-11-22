@@ -83,11 +83,24 @@ class BootFacts(decl: Declarations) {
 }
 
 /**
- * Encode the boot bytes: sections 1–4 and 6–11 in order, then the mount
- * root (13) and startup (14). A deterministic program's entry is left to the
- * engine to select from the URL (`0xffffffff`).
+ * Encode the boot bytes: the environment (sections 1–4 and 6–11), then the
+ * mount root (13) and startup (14). A deterministic program's entry is left
+ * to the engine to select from the URL (`0xffffffff`).
  */
 fun encodeBoot(decl: Declarations, f: BootFacts): ByteArray = bytesOf {
+    bytes(encodeEnvironment(f))
+    section(13) { bytes(decl.mountRoot) }
+    section(14) {
+        if (decl.startupProfile == 1) { u8(1); u8(0); u32(-1) } else u8(0)
+    }
+}
+
+/**
+ * The app-visible environment, sections 1–4 and 6–11 in boot framing: the
+ * start of the boot bytes, and the body of an `Environment` answer (result
+ * tag 31, to FX kind 22).
+ */
+fun encodeEnvironment(f: BootFacts): ByteArray = bytesOf {
     section(1) { str(f.url) }
     section(2) {
         flag(f.storageAvailable); u32(f.storage.size)
@@ -106,9 +119,5 @@ fun encodeBoot(decl: Declarations, f: BootFacts): ByteArray = bytesOf {
     section(11) {
         flag(f.sessionAvailable); u32(f.session.size)
         for ((k, v) in f.session) { str(k); str(v) }
-    }
-    section(13) { bytes(decl.mountRoot) }
-    section(14) {
-        if (decl.startupProfile == 1) { u8(1); u8(0); u32(-1) } else u8(0)
     }
 }

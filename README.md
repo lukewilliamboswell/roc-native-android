@@ -101,16 +101,20 @@ Apps use two modules from the platform:
 | Example | Shows |
 |---|---|
 | [`counter`](examples/counter/main.roc) | local state, text that follows it, showing and hiding |
-| [`todos`](examples/todos/Todos.roc) | a store, a table of rows with a filter, a text field and checkboxes |
+| [`todos`](examples/todos/Todos.roc) | a store, a table of rows with a filter, a text field and checkboxes; the list is saved and comes back when the app restarts |
 | [`stopwatch`](examples/stopwatch/main.roc) | a repeating timer that starts and stops with the app's state |
+| [`device`](examples/device/main.roc) | device facts: online, dark mode, languages, a local clock through the time zone, and a saved preference |
 | [`http`](examples/http/main.roc) | an HTTPS request: loading, progress, status, network and timeout errors, retry and cancel |
 
 ## Limits
 
-- Supported effects: timers, intervals and HTTP (`Engine.http`; no cookie
-  store or HTTP cache, and plain `http://` is blocked by Android's default).
-  Storage, files, workers and ports are not supported yet: an app that asks
-  for one stops with "unsupported effect kind".
+- Supported effects: timers and intervals; HTTP (`Engine.http`; no cookie
+  store or HTTP cache, and plain `http://` is blocked by Android's default);
+  local storage (kept across restarts) and session storage (kept while the
+  process lives); and device facts: online, visible, languages, time zone,
+  and the media queries `prefers-color-scheme` and `prefers-reduced-motion`
+  (any other query reads false). Files, workers and ports are not supported
+  yet: an app that asks for one stops with "unsupported effect kind".
 - Input is limited to taps, text entry, checkboxes and the keyboard's action
   key.
 - arm64 devices and emulators only.

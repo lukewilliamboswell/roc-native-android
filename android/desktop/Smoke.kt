@@ -99,8 +99,7 @@ fun main(args: Array<String>) {
     System.load(File(args[0]).absolutePath)
     val platform = ManualPlatform()
     val renderer = CountingRenderer()
-    val features = listOf<Feature>(HttpSmoke.feature())
-    val host = Host(platform, features)
+    val host = Host(platform, Fakes.features(platform) + HttpSmoke.feature())
     host.renderer = renderer
     host.start()
     platform.advance(0)
@@ -156,9 +155,14 @@ fun main(args: Array<String>) {
             expect("reset", text().contains("0:00.0") && !text().contains("Lap 1"))
         }
         "http" -> HttpSmoke.run(host, platform)
+        "device" -> { deviceCase(host, platform); zoneCases() }
     }
     println("final:\n" + show(host.tree.root))
     host.stop()
+    when (args[1]) {
+        "todos" -> todosRestart(platform)
+        "device" -> deviceRestart(platform)
+    }
     println(if (failures == 0) "PASS ${args[1]}" else "FAILED ${args[1]}: $failures")
     if (failures != 0) kotlin.system.exitProcess(1)
 }

@@ -27,7 +27,10 @@ interface Feature {
     /** Perform a command after its batch is applied, in stream order. */
     fun command(host: Host, op: Int, value: Any) {}
 
-    /** Supply boot facts before mount. */
+    /**
+     * Supply boot facts: before mount, and again for each environment
+     * snapshot (`Host.environment`), so read the live values each time.
+     */
     fun boot(facts: BootFacts, decl: Declarations) {}
 
     /** The engine has mounted (and acknowledged startup is queued). */

@@ -90,6 +90,21 @@ the emulator refuses to start for lack of disk space, run
 - **Effects:** timers and intervals; subscriptions no feature serves are
   accepted and stay idle. Any other effect kind stops with "unsupported
   effect kind".
+- **Storage** (op 16, FX 2, 17, 18, 20, boot sections 2 and 11;
+  `StorageFeature.kt`, `AndroidStorage.kt`): local storage is one
+  SharedPreferences file per app library; session storage is in memory for
+  the process. Reads answer one task later. With a single window
+  `StorageChanges` never reports. A write that throws reaches
+  `StorageWriteFailures` (as `Unavailable`), but SharedPreferences applies
+  writes asynchronously, so a disk failure is not seen.
+- **Environment** (boot sections 3, 4, 6–10, FX 6, 7, 16, 22;
+  `EnvironmentFeature.kt`, `AndroidEnvironment.kt`): online from
+  ConnectivityManager, visible while the activity is started, languages from
+  LocaleList, a SecureRandom seed, and the zone from java.time's rules (at
+  most 128 offsets over the declared `zone_days`). Media queries know only
+  `prefers-color-scheme` and `prefers-reduced-motion`. A
+  deterministic-startup program boots on neutral facts and samples them with
+  FX 22, as in the browser.
 - **HTTP** (FX 1, `HttpFeature.kt`): `HttpURLConnection` on a background
   pool, with answers, timeouts and progress (tag 26, receiving only) delivered
   on the engine thread. CANCEL disconnects and nothing is answered after it.

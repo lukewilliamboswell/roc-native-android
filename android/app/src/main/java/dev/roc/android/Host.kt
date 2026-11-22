@@ -67,12 +67,23 @@ class Host(private val platform: Platform, private val features: List<Feature> =
     fun start() {
         check(RocEngine.nativeVersion() == PROTOCOL) { "engine speaks protocol ${RocEngine.nativeVersion()}, host $PROTOCOL" }
         declarations = Declarations(RocEngine.nativeKeys())
-        val facts = BootFacts(declarations)
-        for (f in features) f.boot(facts, declarations)
+        // A deterministic startup program mounts on neutral facts (as the
+        // browser does) and samples the live ones with FX 22.
+        val facts = if (declarations.startupProfile == 1) BootFacts(declarations) else environment()
         applyBatch(RocEngine.nativeInit(encodeBoot(declarations, facts)))
         started = true
         for (f in features) f.started(this)
         drain()
+    }
+
+    /**
+     * A fresh sample of the environment, every feature filling its facts:
+     * the boot facts at mount, and an environment snapshot (FX 22) later.
+     */
+    fun environment(): BootFacts {
+        val facts = BootFacts(declarations)
+        for (f in features) f.boot(facts, declarations)
+        return facts
     }
 
     fun stop() {
