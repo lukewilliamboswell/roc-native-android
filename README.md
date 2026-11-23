@@ -11,9 +11,9 @@ it draws real Android widgets (no WebView), and the reactive engine from
 exactly the views that depend on what changed.
 
 ```roc
-app [main] { pf: platform "../../platform/main.roc" }
+app [main] { engine: "https://github.com/lukewilliamboswell/roc-signals/releases/download/0.8.0-rc1/engine-5CJF6WUFya83N1eWziLTMKHNLS5ZucFAMF5j7vWsyjQy.tar.zst", pf: platform "../../platform/main.roc" }
 
-import pf.Engine exposing [Elem, In, Root, State]
+import engine.Engine exposing [Elem, In, Root, State]
 import pf.Ui
 
 main : Engine.Program
@@ -53,8 +53,8 @@ cd counter
 roc android.roc run
 ```
 
-`init` writes a counter app, `main.roc`, whose header names the platform
-release, and a copy of `android.roc`. `run` builds the app, installs it on
+`init` writes a counter app, `main.roc`, whose header names the platform and engine
+releases, and a copy of `android.roc`. `run` builds the app, installs it on
 the running emulator or connected phone, and starts it. Edit `main.roc` and
 run it again.
 
@@ -88,7 +88,11 @@ something a phone can load.
 
 ## Writing an app
 
-Apps use these modules from the platform:
+Apps import `engine.Engine`, `engine.Port` and `engine.PortJson` from the
+roc-signals package, and `pf.Ui` from the Android platform. When upgrading
+an existing app, copy the `engine` dependency from the example above and
+change imports of `pf.Engine`, `pf.Port` and `pf.PortJson` to use `engine`.
+Use the same engine URL as the Android platform release your app builds with.
 
 - **`Engine`**: state, signals, the shared store, tables, effects and entry
   routes. It is the same engine as roc-signals, so its
@@ -124,7 +128,7 @@ Sizes are in dp. Any element with a click handler is tappable.
 
 The examples live in this repository and depend on its working tree. To run
 them all, see [CONTRIBUTING.md](CONTRIBUTING.md); to try one as an app, copy
-its `main.roc` over the one `init` wrote and keep `init`'s platform line.
+its `main.roc` over the one `init` wrote and keep the dependency header written by `init`.
 
 | Example | Shows |
 |---|---|

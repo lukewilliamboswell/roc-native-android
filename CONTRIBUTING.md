@@ -7,7 +7,7 @@ redistributes. For writing apps, see the [README](README.md).
 
 ```
  Roc app (examples/*)          platform/ (Roc)                 android/ (Kotlin)
- Ui.column / Ui.button  ──►  Engine + Core (verbatim)  ──►  Tree.kt         decode commands (protocol 23)
+ Ui.column / Ui.button  ──►  EngineHost (package)    ──►  Tree.kt         decode commands (protocol 23)
                              main.roc  keys/init/event      Host.kt         turns, effects → features
                              host/host.zig  JNI, no libc    ViewRenderer.kt Tree ─► Views
                                    │
@@ -27,39 +27,33 @@ remounting. Before mount, the host reads the program's declarations
 (`roc_engine_keys`) and builds the boot bytes from them (`Boot.kt`), with each
 feature supplying its own facts.
 
-### What is copied, what is new
+### The platform and engine
 
-- **Verbatim from roc-signals** (`platform/`): `Core`, `Engine`,
-  `SignalCore`, `TableCore`, `View`, `Seq`, `Layout`, `EntryRoutes`,
-  `ReadyIndex`, `Url`, `Spelling`, `MarkupAdvice`, `Web`, and for ports
-  `Port`, `PortJson`, `PortJsonBody`, `PortRegistry`, `Wire` and
-  `WorkerCodec` (which brings the `cbor` package). Never edit these here:
-  `tests/engine-modules.sha256` records their digests, and `check` compares
-  them. `Web` and the `parser` package are present only because the engine
-  imports them.
-- **This project's**:
-  - `platform/main.roc`: the platform root.
-  - `platform/Ui.roc`: the native vocabulary.
-  - `host/host.zig`: the JNI host, with `host/resources.zig` (the file-handle
-    heap, copied from roc-signals' host), built by `host/build.zig`.
-  - `android/`: the Kotlin host and the app shell.
-  - `cli/`: the `android.roc` tool package app authors use.
-- **No glue file**: the Roc↔host boundary is a handful of functions over
-  `List(U8)`, a `Box` and `U32`, so a handwritten `extern struct` covers it.
+The Android platform declares the standalone roc-signals engine package.
+The platform uses `EngineHost` for turns and keeps its host bindings in
+`platform/main.roc`. The examples that import engine types declare the same
+engine URL. Roc resolves the engine's parser and cbor dependencies.
+
+- `platform/Ui.roc` defines the Android vocabulary.
+- `host/host.zig` implements JNI. Its file-handle heap in
+  `host/resources.zig` comes from roc-signals.
+- `android/` contains the Kotlin host and app shell.
+- `cli/` contains the `android.roc` tool.
+- The Roc↔host boundary uses a handwritten `extern struct` over Roc lists
+  and an opaque state handle.
 
 ## Layout
 
 ```
 Blueprint.roc        the development environment and its tasks (Blueprint.lock pins it)
 host/                the JNI host (Zig); `zig build` makes each target's libhost.a
-platform/main.roc    the platform root, Ui.roc and the verbatim engine
+platform/main.roc    the Android platform root and Ui.roc
 platform/targets/    host outputs, never committed
 examples/            apps, depending on the working tree
 android/             Gradle project: the Kotlin host and the app shell
 android/desktop/     the desktop smoke test (runs the engine on the JVM)
 cli/                 the android.roc tool package (Bundle.roc is generated per release)
 scripts/             the tasks, as Roc scripts run by roc-stable
-tests/               the engine modules' recorded digests
 ```
 
 ## Build and test
@@ -72,7 +66,7 @@ Python 3 and Xcode's command-line tools from the machine.
 
 ```sh
 blueprint run check            # the pull-request gate, as CI runs it
-blueprint run check -- smoke   # one stage (pins engine fmt scripts build test smoke android bundle)
+blueprint run check -- smoke   # one stage (pins fmt scripts build test smoke android bundle)
 blueprint run build            # host, then every example (build/lib<e>.dylib, build/android/lib<e>.so)
 blueprint run build -- counter # host and one example
 blueprint run smoke            # every example on the desktop JVM
@@ -215,7 +209,7 @@ same in both builds.
 ## What the platform bundle redistributes
 
 `roc bundle` packs exactly the files it is given. `scripts/bundle.roc` stages
-the tracked platform modules, each target's `libhost.a` and the root's
+the Android platform modules, each target's `libhost.a` and the root's
 license files, and names every one of them. The bundle holds:
 
 - the platform's `.roc` source;

@@ -83,8 +83,8 @@ gitignore =
 
 ## The scaffold names the release's platform, not a path.
 expect {
-	source = "app [main] { pf: platform \"../../platform/main.roc\" }\n\nimport pf.Engine\n"
-	Init.with_platform(source, "https://x/0.0.1/h.tar.zst") == "app [main] { pf: platform \"https://x/0.0.1/h.tar.zst\" }\n\nimport pf.Engine\n"
+	source = "app [main] { engine: \"https://x/engine.tar.zst\", pf: platform \"../../platform/main.roc\" }\n\nimport engine.Engine\n"
+	Init.with_platform(source, "https://x/0.0.1/h.tar.zst") == "app [main] { engine: \"https://x/engine.tar.zst\", pf: platform \"https://x/0.0.1/h.tar.zst\" }\n\nimport engine.Engine\n"
 }
 
 ## A new directory gets a copy of the tool; this directory already has it.

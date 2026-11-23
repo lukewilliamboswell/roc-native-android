@@ -5,7 +5,7 @@ Repo := [].{
 
 	## The check's stages, in the order a full run takes them.
 	stages : List(Str)
-	stages = ["pins", "engine", "fmt", "scripts", "build", "test", "smoke", "android", "bundle"]
+	stages = ["pins", "fmt", "scripts", "build", "test", "smoke", "android", "bundle"]
 
 	## The stages named on the command line, or every stage when none is.
 	selection : List(Str) -> Try(List(Str), [Unknown(Str)])
@@ -16,32 +16,6 @@ Repo := [].{
 			Err(_) => Ok(if (named.is_empty()) Repo.stages else Repo.stages.keep_if(|stage| named.contains(stage)))
 		}
 	}
-
-	## The engine modules, byte-identical copies of roc-signals. They are
-	## never edited or reformatted here; `tests/engine-modules.sha256` holds
-	## their digests.
-	engine_modules : List(Str)
-	engine_modules = [
-		"Core",
-		"Engine",
-		"SignalCore",
-		"TableCore",
-		"View",
-		"Seq",
-		"Layout",
-		"EntryRoutes",
-		"ReadyIndex",
-		"Url",
-		"Spelling",
-		"MarkupAdvice",
-		"Web",
-		"Port",
-		"PortJson",
-		"PortJsonBody",
-		"PortRegistry",
-		"Wire",
-		"WorkerCodec",
-	].map(|name| "platform/${name}.roc")
 
 	## The tag of the `roc-stable` release Blueprint.roc fetches.
 	stable_tag : Str -> Try(Str, [NoTag])
@@ -193,8 +167,6 @@ Repo := [].{
 expect Repo.selection([]) == Ok(Repo.stages)
 expect Repo.selection(["--", "smoke", "build"]) == Ok(["build", "smoke"])
 expect Repo.selection(["bogus"]) == Err(Unknown("bogus"))
-
-expect Repo.engine_modules.len() == 19
 
 expect Repo.stable_tag("x = Fetch(\"roc-stable\", Recipes.roc_nightly(\"nightly-2026-11-14-a87808d\"))") == Ok("nightly-2026-11-14-a87808d")
 expect Repo.stable_tag("config = []") == Err(NoTag)

@@ -55,8 +55,8 @@ config = [
 			# `java` runs the smoke test (and kotlinc), `objdump` and `nm`
 			# (Xcode's LLVM tools, which read ELF) check what the Android
 			# libraries link, `python3` serves the bundle to its consumer test,
-			# `shasum` checks the engine modules' digests and `git` lists the
-			# tracked files the checks read.
+			# `shasum` reports the bundle digest and `git` lists the tracked
+			# files the checks read.
 			Expect(["roc", "java", "objdump", "nm", "python3", "shasum", "git"]),
 		],
 	),
@@ -65,7 +65,7 @@ config = [
 	# sdk.dir in android/local.properties).
 	Environment("android", [Programs([zig_program]), Expect(["roc", "java"])]),
 	Shell("default", [Use("dev")]),
-	# The per-pull-request gate: compiler pins, engine digests, formatting,
+	# The per-pull-request gate: compiler pins, formatting,
 	# the scripts' tests, the build, `roc test`, the smoke test, the Android
 	# libraries' link audit and the bundle with its consumer test.
 	# `check -- STAGE...` runs only the named stages, in order.

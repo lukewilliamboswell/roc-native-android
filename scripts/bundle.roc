@@ -22,7 +22,7 @@ import src/Repo
 ##     blueprint run bundle -- --prebuilt                # bundle the host already built
 ##
 ## It builds the host (`scripts/build.roc --host`) unless `--prebuilt`,
-## stages the tracked `platform/*.roc` modules, each target's `libhost.a` and
+## stages the tracked Android platform modules, each target's `libhost.a` and
 ## the licence notices under `build/`, and runs `roc bundle` there. `roc
 ## bundle` packs only the files it is given, so the bundle holds exactly
 ## these: no external linker input and no runtime library. The output
@@ -65,9 +65,13 @@ main! = |raw_args| {
 	stage = "${root}/build/bundle-stage"
 	fresh!(stage)?
 	listed = Cmd.new("git").args(["ls-files", "--", "platform/*.roc"].map(OsStr.from_str)).capture!()?
-	modules = listed.split_on("\n").keep_if(|line| !line.is_empty()).map(|path| path.drop_prefix("platform/"))
-	for name in modules {
-		Path.copy!(Path.utf8("platform/${name}"), Path.utf8("${stage}/${name}"))?
+	var $modules = []
+	for path in listed.split_on("\n").keep_if(|line| !line.is_empty()) {
+		if Path.exists!(Path.utf8(path))? {
+			name = path.drop_prefix("platform/")
+			Path.copy!(Path.utf8(path), Path.utf8("${stage}/${name}"))?
+			$modules = $modules.append(name)
+		}
 	}
 	for input in Bundle.host_libraries {
 		target_dir = input.drop_suffix("/libhost.a")
@@ -77,7 +81,7 @@ main! = |raw_args| {
 	for notice in Bundle.notices {
 		Path.copy!(Path.utf8(notice), Path.utf8("${stage}/${notice}"))?
 	}
-	files = Bundle.files(modules)
+	files = Bundle.files($modules)
 
 	fresh!(out)?
 	step!(Cmd.new("roc").args(["bundle"].concat(files).concat(["--output-dir", out]).map(OsStr.from_str)).cwd(Path.utf8(stage)), "roc bundle (${files.len().to_str()} files)")?
@@ -103,7 +107,7 @@ main! = |raw_args| {
 consumer_test! : Str, Str, Str => Try({}, _)
 consumer_test! = |root, out, bundle| {
 	server = Cmd.new("python3")
-		.args(["-I", "-u", "-m", "http.server", "0", "--bind", "::", "--directory", out].map(OsStr.from_str))
+		.args(["-I", "-u", "-m", "http.server", "0", "--bind", "::1", "--directory", out].map(OsStr.from_str))
 		.stdin(Null)
 		.stdout(Pipe)
 		.stderr(MergeWithStdout)

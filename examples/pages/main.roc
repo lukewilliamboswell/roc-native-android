@@ -1,6 +1,6 @@
-app [main] { pf: platform "../../platform/main.roc" }
+app [main] { engine: "https://github.com/lukewilliamboswell/roc-signals/releases/download/0.8.0-rc1/engine-5CJF6WUFya83N1eWziLTMKHNLS5ZucFAMF5j7vWsyjQy.tar.zst", pf: platform "../../platform/main.roc" }
 
-import pf.Engine exposing [Click, Elem, In, Root, State]
+import engine.Engine exposing [Click, Elem, In, Root, State]
 import pf.Ui
 
 ## Pages: entry routes pick the first page, links push history entries, and

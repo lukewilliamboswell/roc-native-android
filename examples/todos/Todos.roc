@@ -1,6 +1,6 @@
 ## Adapted from roc-signals' www/samples/todos: the same store, decision and
 ## query plan and saved list, drawn with the native `Ui` vocabulary.
-import pf.Engine exposing [Elem, Signal, State, Table]
+import engine.Engine exposing [Elem, Signal, State, Table]
 import pf.Ui
 
 ## The tutorial's to-do list: a table of to-dos and two cells in the app's

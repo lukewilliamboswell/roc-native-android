@@ -1,4 +1,4 @@
-import Engine exposing [Attr, Click, Elem, FilesHandler, Handler, HandlerOf, Signal, Window]
+import engine.Engine exposing [Attr, Click, Elem, FilesHandler, Handler, HandlerOf, Signal, Window]
 
 ## The native vocabulary apps build Android screens from. Each builder is one
 ## engine element that the Kotlin host (`ViewRenderer.kt`) maps to one View:

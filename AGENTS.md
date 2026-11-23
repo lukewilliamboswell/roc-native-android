@@ -7,26 +7,20 @@ rest need a reviewer.
 ## Before you open a pull request
 
 Run `blueprint run check` with a current Roc nightly installed as `roc`. It
-is the same gate CI runs on `macos-15`. It checks the compiler pins, the
-engine digests and formatting, and runs the scripts' tests. It then builds the
-host and every example for both targets, runs `roc test`, and runs the
-desktop smoke test of every example. It audits the Android libraries' links.
+is the same gate CI runs on `macos-15`. It checks compiler pins and formatting,
+and runs the scripts' tests. It then builds the host and every example for
+both targets, runs `roc test` and the desktop smoke tests, and audits the
+Android libraries' links.
 Last, it builds the platform bundle and an example against it. On a device
 or emulator, check what the smoke test cannot: views, gestures, the keyboard
 and rotation (see CONTRIBUTING.md).
 
-## The engine is a verbatim copy
+## The engine is a released package
 
-The modules `Repo.engine_modules` lists (`scripts/src/Repo.roc`) are
-byte-identical copies of roc-signals' `platform/`. `tests/engine-modules.sha256`
-holds their digests, checked against roc-signals `a13ff70e`. Never edit or
-reformat them here. A change the engine needs is made in roc-signals first.
-
-To take a newer engine, copy all of these modules from one roc-signals
-commit. In the same commit, regenerate the digests with
-`shasum -a 256 <the modules> > tests/engine-modules.sha256` and update the
-revision above. The native vocabulary belongs in `platform/Ui.roc`, and the
-root in `platform/main.roc`.
+Use the standalone roc-signals engine release declared in `platform/main.roc`.
+When upgrading, set the same package URL in the example app headers and README.
+The native vocabulary belongs in `platform/Ui.roc`, and the host entry points
+in `platform/main.roc` use the package's `EngineHost` API.
 
 ## The Android library links nothing
 

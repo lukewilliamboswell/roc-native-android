@@ -1,6 +1,6 @@
-app [main] { pf: platform "../../platform/main.roc" }
+app [main] { engine: "https://github.com/lukewilliamboswell/roc-signals/releases/download/0.8.0-rc1/engine-5CJF6WUFya83N1eWziLTMKHNLS5ZucFAMF5j7vWsyjQy.tar.zst", pf: platform "../../platform/main.roc" }
 
-import pf.Engine exposing [Elem, Signal, State, Table]
+import engine.Engine exposing [Elem, Signal, State, Table]
 import pf.Ui
 
 ## Contacts: 10 000 generated people in a table, drawn as a window of

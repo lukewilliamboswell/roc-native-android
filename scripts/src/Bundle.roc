@@ -89,8 +89,8 @@ expect
 		== ["main.roc", "Core.roc", "Ui.roc", "targets/arm64musl/libhost.a", "targets/arm64mac/libhost.a", "LICENSE", "THIRD_PARTY_LICENSES.md"]
 
 expect
-	Bundle.released_main("app [main] { pf: platform \"../../platform/main.roc\" }\n", "http://localhost:8000/abc.tar.zst")
-		== Ok("app [main] { pf: platform \"http://localhost:8000/abc.tar.zst\" }\n")
+	Bundle.released_main("app [main] { engine: \"https://x/engine.tar.zst\", pf: platform \"../../platform/main.roc\" }\n", "http://localhost:8000/abc.tar.zst")
+		== Ok("app [main] { engine: \"https://x/engine.tar.zst\", pf: platform \"http://localhost:8000/abc.tar.zst\" }\n")
 expect Bundle.released_main("app [main] { pf: platform \"x\" }\n", "u") == Err(NoPlatformPath)
 
 expect Bundle.served_port("Serving HTTP on :: port 54321 (http://[::]:54321/) ...\n") == Ok(54321)

@@ -17,7 +17,6 @@ import src/Repo
 ## stage, and `blueprint run check -- STAGE...` the named ones, in order.
 ##
 ## - `pins`: only the scripts pin a compiler, and they pin `roc-stable`.
-## - `engine`: the engine modules match their recorded roc-signals digests.
 ## - `fmt`: `roc fmt --check` over the platform, examples and tool, and
 ##   `roc-stable fmt --check` over the scripts.
 ## - `scripts`: the scripts' `expect` tests.
@@ -68,7 +67,6 @@ run_stage! : Str => Try(List(Str), _)
 run_stage! = |stage|
 	match stage {
 		"pins" => pins!()
-		"engine" => engine!()
 		"fmt" => fmt!()
 		"scripts" => scripts!()
 		"build" => run!("roc-stable", ["scripts/build.roc"])
@@ -79,12 +77,17 @@ run_stage! = |stage|
 		_ => Ok(["no such stage"])
 	}
 
-## The files git tracks or would track (untracked files .gitignore does not
-## exclude), under the given paths.
+## Existing files under the given paths that Git tracks or would track.
 tracked! : List(Str) => Try(List(Str), _)
 tracked! = |paths| {
 	listed = Cmd.new("git").args(["ls-files", "--cached", "--others", "--exclude-standard", "--"].concat(paths).map(OsStr.from_str)).capture!()?
-	Ok(listed.split_on("\n").keep_if(|line| !line.is_empty()))
+	var $files = []
+	for path in listed.split_on("\n").keep_if(|line| !line.is_empty()) {
+		if Path.exists!(Path.utf8(path))? {
+			$files = $files.append(path)
+		}
+	}
+	Ok($files)
 }
 
 pins! : () => Try(List(Str), _)
@@ -105,16 +108,6 @@ pins! = || {
 	}
 	note!("${$files.len().to_str()} Roc files; the scripts pin ${tag}")
 	Ok($problems)
-}
-
-## The engine modules are the roc-signals copies, unchanged: their digests
-## are the ones `tests/engine-modules.sha256` records.
-engine! : () => Try(List(Str), _)
-engine! = || {
-	recorded = Path.read_utf8!(Path.utf8("tests/engine-modules.sha256"))?
-	missing = Repo.engine_modules.keep_if(|path| !recorded.contains("  ${path}\n"))
-	digests = run!("shasum", ["-a", "256", "--quiet", "--check", "tests/engine-modules.sha256"])?
-	Ok(missing.map(|path| "tests/engine-modules.sha256 records no digest for ${path}").concat(digests))
 }
 
 fmt! : () => Try(List(Str), _)
